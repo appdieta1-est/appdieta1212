@@ -231,6 +231,9 @@
         <button class="btn scan" id="btnScan" style="flex:1;">📷 Scansiona codice a barre</button>
       </div>
       <div class="btnrow" style="margin-top:8px;">
+        <button class="btn" id="btnManualBarcode" style="flex:1;">🔢 Scrivi codice a barre</button>
+      </div>
+      <div class="btnrow" style="margin-top:8px;">
         <button class="btn" id="btnQuickAdd" style="flex:1;">＋ Aggiunta rapida</button>
         <button class="btn" id="btnManualAdd" style="flex:1;">✎ Manuale / libero</button>
       </div>
@@ -324,7 +327,25 @@
     <h2>Scansiona codice a barre</h2>
     <div id="scanner-region"></div>
     <div class="scan-status" id="scanStatus">Inquadra il codice a barre del prodotto</div>
+    <div id="zoomControlWrap" style="display:none; margin-top:10px;">
+      <label class="field" style="margin-top:0;">Zoom fotocamera (se l'immagine è troppo ravvicinata, sposta a sinistra)</label>
+      <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1">
+    </div>
     <div id="offResultWrap"></div>
+  </div>
+</div>
+
+<!-- MANUAL BARCODE MODAL -->
+<div class="modal-backdrop" id="modalManualBarcode">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" data-close="modalManualBarcode">✕</button>
+    <div class="modal-handle"></div>
+    <h2>Scrivi codice a barre</h2>
+    <p style="font-size:13px; color:var(--ink-dim); margin-top:-6px;">Scrivi i numeri sotto le barre stampate sulla confezione (di solito 8-13 cifre).</p>
+    <input type="text" inputmode="numeric" pattern="[0-9]*" id="manualBarcodeInput" placeholder="es. 8001505005707">
+    <button class="btn primary block" style="margin-top:16px;" id="manualBarcodeSearchBtn">Cerca prodotto</button>
+    <div class="scan-status" id="manualBarcodeStatus" style="text-align:left;"></div>
+    <div id="manualBarcodeResultWrap"></div>
   </div>
 </div>
 
@@ -1227,6 +1248,7 @@
   $('#btnScan').addEventListener('click', async ()=>{
     $('#offResultWrap').innerHTML = '';
     $('#scanStatus').textContent = 'Inquadra il codice a barre del prodotto';
+    $('#zoomControlWrap').style.display = 'none';
     openModal('modalScan');
     try{
       scannerCtrl = new Html5Qrcode('scanner-region');
@@ -1239,49 +1261,72 @@
           Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
           Html5QrcodeSupportedFormats.CODE_128
-        ],
-        videoConstraints:{
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          zoom: 1
-        }
+        ]
       };
-      try{
-        // preferito: lascia scegliere al browser la fotocamera "normale" posteriore,
-        // evitando che iOS selezioni l'obiettivo macro/ultra-grandangolare (troppo zoomato/sfocato da vicino)
-        await scannerCtrl.start({ facingMode: { ideal: 'environment' } }, config, onScanSuccess, ()=>{});
-      }catch(innerErr){
-        // fallback: se il browser non supporta facingMode qui, prova scegliendo manualmente una camera
-        const cameras = await Html5Qrcode.getCameras();
-        const camId = (cameras.find(c=>/back|rear|environment/i.test(c.label)) || cameras[cameras.length-1] || cameras[0]).id;
-        await scannerCtrl.start(camId, config, onScanSuccess, ()=>{});
+      // Scelgo esplicitamente la lente "normale" posteriore, evitando ultra-grandangolare/macro/tele
+      // (su iPhone con più obiettivi, quella sbagliata causa l'effetto troppo zoomato/sfocato da vicino)
+      const cameras = await Html5Qrcode.getCameras();
+      let camId = null;
+      if(cameras && cameras.length){
+        const normal = cameras.find(c => /back camera$/i.test(c.label.trim()) || /^back camera/i.test(c.label) );
+        const anyBack = cameras.find(c => /back|rear|environment/i.test(c.label) && !/ultra|wide angle|tele|macro/i.test(c.label));
+        const fallbackBack = cameras.find(c => /back|rear|environment/i.test(c.label));
+        camId = (normal || anyBack || fallbackBack || cameras[cameras.length-1] || cameras[0]).id;
       }
+      if(camId){
+        await scannerCtrl.start(camId, config, onScanSuccess, ()=>{});
+      } else {
+        await scannerCtrl.start({ facingMode: { ideal:'environment' } }, config, onScanSuccess, ()=>{});
+      }
+      setupZoomControl();
     }catch(err){
       $('#scanStatus').textContent = 'Impossibile accedere alla fotocamera. Controlla i permessi.';
       console.error(err);
     }
   });
+
+  function setupZoomControl(){
+    try{
+      const caps = scannerCtrl.getRunningTrackCapabilities ? scannerCtrl.getRunningTrackCapabilities() : null;
+      if(caps && caps.zoom){
+        const min = caps.zoom.min ?? 1;
+        const max = caps.zoom.max ?? 5;
+        const step = caps.zoom.step ?? 0.1;
+        const slider = $('#zoomSlider');
+        slider.min = min; slider.max = max; slider.step = step; slider.value = min;
+        $('#zoomControlWrap').style.display = 'block';
+        // forza subito lo zoom minimo possibile, per partire il più "largo" possibile
+        scannerCtrl.applyVideoConstraints({ advanced:[{ zoom: min }] }).catch(()=>{});
+        slider.oninput = ()=>{
+          scannerCtrl.applyVideoConstraints({ advanced:[{ zoom: Number(slider.value) }] }).catch(()=>{});
+        };
+      } else {
+        $('#zoomControlWrap').style.display = 'none';
+      }
+    }catch(e){
+      $('#zoomControlWrap').style.display = 'none';
+    }
+  }
+
   async function stopScanner(){
     if(scannerCtrl){ try{ await scannerCtrl.stop(); scannerCtrl.clear(); }catch(e){} scannerCtrl = null; }
+    $('#zoomControlWrap').style.display = 'none';
   }
   document.querySelector('[data-close="modalScan"]').addEventListener('click', stopScanner);
   $('#modalScan').addEventListener('click', (e)=>{ if(e.target.id==='modalScan') stopScanner(); });
 
   let lastScanned = null;
-  async function onScanSuccess(decodedText){
-    if(decodedText === lastScanned) return;
-    lastScanned = decodedText;
-    $('#scanStatus').textContent = 'Codice trovato: ' + decodedText + ' — cerco il prodotto...';
-    await stopScanner();
+  async function lookupBarcodeAndRender(code, statusEl, resultWrapEl, closeModalId){
+    statusEl.textContent = 'Cerco il prodotto...';
+    resultWrapEl.innerHTML = '';
     try{
-      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(decodedText)}.json?fields=product_name,brands,nutriments,image_small_url`);
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,nutriments,image_small_url`);
       const data = await res.json();
       if(data.status !== 1 || !data.product){
-        $('#scanStatus').textContent = 'Prodotto non trovato nel database. Puoi aggiungerlo manualmente.';
-        $('#offResultWrap').innerHTML = `<button class="btn primary block" id="manualFromScanBtn" style="margin-top:10px;">Aggiungi manualmente</button>`;
+        statusEl.textContent = 'Prodotto non trovato nel database. Puoi aggiungerlo manualmente.';
+        resultWrapEl.innerHTML = `<button class="btn primary block" id="manualFromScanBtn" style="margin-top:10px;">Aggiungi manualmente</button>`;
         $('#manualFromScanBtn').addEventListener('click', ()=>{
-          closeModal('modalScan');
+          closeModal(closeModalId);
           manualPrefill = null;
           $('#manualTitle').textContent = 'Aggiungi alimento';
           $('#manualName').value=''; $('#manualKcal').value=''; $('#manualProt').value='';
@@ -1299,8 +1344,8 @@
         carb: n['carbohydrates_100g'] ?? 0,
         fat: n['fat_100g'] ?? 0,
       };
-      $('#scanStatus').textContent = 'Prodotto trovato';
-      $('#offResultWrap').innerHTML = `
+      statusEl.textContent = 'Prodotto trovato';
+      resultWrapEl.innerHTML = `
         <div class="off-result">
           <div class="pname">${escapeHtml(p.product_name||'Prodotto senza nome')}</div>
           <div class="pbrand">${escapeHtml(p.brands||'')}</div>
@@ -1310,7 +1355,7 @@
           <button class="btn primary block" id="useOffBtn" style="margin-top:12px;">Usa questo prodotto</button>
         </div>`;
       $('#useOffBtn').addEventListener('click', ()=>{
-        closeModal('modalScan');
+        closeModal(closeModalId);
         manualPrefill = per100;
         $('#manualTitle').textContent = 'Conferma quantità';
         initStaticChips();
@@ -1323,10 +1368,30 @@
         openModal('modalManual');
       });
     }catch(err){
-      $('#scanStatus').textContent = 'Errore di connessione al database alimentare.';
+      statusEl.textContent = 'Errore di connessione al database alimentare.';
       console.error(err);
     }
   }
+
+  async function onScanSuccess(decodedText){
+    if(decodedText === lastScanned) return;
+    lastScanned = decodedText;
+    $('#scanStatus').textContent = 'Codice trovato: ' + decodedText;
+    await stopScanner();
+    await lookupBarcodeAndRender(decodedText, $('#scanStatus'), $('#offResultWrap'), 'modalScan');
+  }
+
+  $('#btnManualBarcode').addEventListener('click', ()=>{
+    $('#manualBarcodeInput').value = '';
+    $('#manualBarcodeStatus').textContent = '';
+    $('#manualBarcodeResultWrap').innerHTML = '';
+    openModal('modalManualBarcode');
+  });
+  $('#manualBarcodeSearchBtn').addEventListener('click', ()=>{
+    const code = $('#manualBarcodeInput').value.trim();
+    if(!code){ toast('Scrivi un codice a barre'); return; }
+    lookupBarcodeAndRender(code, $('#manualBarcodeStatus'), $('#manualBarcodeResultWrap'), 'modalManualBarcode');
+  });
 
   /* ---------- istruzioni inline nell'esercizio (dalla libreria) ---------- */
   function findLibraryExercise(name){
