@@ -821,7 +821,7 @@
   let currentDate = new Date();
   let calViewMonth = new Date();
   let currentTab = 'diario';
-  let targets = { kcal:2000, prot:120, carb:250, fat:65 };
+  let targets = { kcal:1715, prot:100, carb:230, fat:46 }; // media settimanale calcolata dal piano caricato
   let foodEntries = [];
   let checkedMap = {};
   let workoutEntries = [];
@@ -1230,18 +1230,33 @@
     openModal('modalScan');
     try{
       scannerCtrl = new Html5Qrcode('scanner-region');
-      const cameras = await Html5Qrcode.getCameras();
-      const camId = (cameras.find(c=>/back|rear|environment/i.test(c.label)) || cameras[cameras.length-1] || cameras[0]).id;
-      await scannerCtrl.start(
-        camId,
-        { fps:10, qrbox:{width:250,height:150}, formatsToSupport:[
-            Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.CODE_128
-        ]},
-        onScanSuccess,
-        ()=>{}
-      );
+      const config = {
+        fps:10,
+        qrbox:{width:280,height:160},
+        aspectRatio: 1.777,
+        disableFlip:false,
+        formatsToSupport:[
+          Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128
+        ],
+        videoConstraints:{
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          zoom: 1
+        }
+      };
+      try{
+        // preferito: lascia scegliere al browser la fotocamera "normale" posteriore,
+        // evitando che iOS selezioni l'obiettivo macro/ultra-grandangolare (troppo zoomato/sfocato da vicino)
+        await scannerCtrl.start({ facingMode: { ideal: 'environment' } }, config, onScanSuccess, ()=>{});
+      }catch(innerErr){
+        // fallback: se il browser non supporta facingMode qui, prova scegliendo manualmente una camera
+        const cameras = await Html5Qrcode.getCameras();
+        const camId = (cameras.find(c=>/back|rear|environment/i.test(c.label)) || cameras[cameras.length-1] || cameras[0]).id;
+        await scannerCtrl.start(camId, config, onScanSuccess, ()=>{});
+      }
     }catch(err){
       $('#scanStatus').textContent = 'Impossibile accedere alla fotocamera. Controlla i permessi.';
       console.error(err);
@@ -1544,9 +1559,11 @@
   });
 
   /* ---------- modal registra allenamento: modalità peso ---------- */
+  function currentWorkoutWeightModeLabel(){
+    return workoutWeightMode==='nessuno' ? 'Corpo libero' : (workoutWeightMode==='diretto' ? 'Peso diretto' : '% del massimale');
+  }
   function buildWorkoutWeightModeChips(){
-    const label = workoutWeightMode==='nessuno' ? 'Corpo libero' : (workoutWeightMode==='diretto' ? 'Peso diretto' : '% del massimale');
-    buildChips($('#workoutWeightModeChips'), ['Corpo libero','Peso diretto','% del massimale'], ()=>label,
+    buildChips($('#workoutWeightModeChips'), ['Corpo libero','Peso diretto','% del massimale'], currentWorkoutWeightModeLabel,
       v=>{ workoutWeightMode = (v==='Corpo libero') ? 'nessuno' : (v==='Peso diretto' ? 'diretto' : 'percentuale'); toggleWorkoutWeightMode(); });
   }
   function toggleWorkoutWeightMode(){
