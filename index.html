@@ -633,25 +633,11 @@
 
   let lockFailedAttempts = 0;
   let lockLockedUntil = 0;
-  const LOCK_TRUST_DAYS = 7;
-  const LOCK_TRUST_KEY = 'logbook_trusted_until';
 
   function lockRemainingSeconds(){
     return Math.max(0, Math.ceil((lockLockedUntil - Date.now())/1000));
   }
 
-  function isDeviceTrusted(){
-    try{
-      const until = Number(localStorage.getItem(LOCK_TRUST_KEY));
-      return until && Date.now() < until;
-    }catch(e){ return false; }
-  }
-  function trustThisDeviceForAWhile(){
-    try{
-      const until = Date.now() + LOCK_TRUST_DAYS*24*60*60*1000;
-      localStorage.setItem(LOCK_TRUST_KEY, String(until));
-    }catch(e){}
-  }
   function unlockNow(){
     document.body.classList.remove('locked');
     const el = document.getElementById('lockScreen');
@@ -703,25 +689,18 @@
         userVerification: 'required',
         timeout: 60000
       }});
-      trustThisDeviceForAWhile();
       unlockNow();
       return true;
     }catch(e){ return false; }
   }
 
-  if(isDeviceTrusted()){
-    unlockNow();
-  } else {
-    // se Face ID è già configurato su questo telefono, mostra il pulsante ma parte SOLO al tocco
-    // (mai in automatico: i browser richiedono un gesto utente reale per WebAuthn, altrimenti
-    // il prompt può restare "in sospeso" e bloccare la pagina)
-    (async()=>{
-      if(hasFaceIdRegistered() && await faceIdAvailable()){
-        document.getElementById('faceIdUnlockBtn').style.display = 'block';
-        document.getElementById('faceIdUnlockBtn').addEventListener('click', tryFaceIdUnlock);
-      }
-    })();
-  }
+  // il blocco si presenta sempre: nessuna memoria "ricordati per N giorni"
+  (async()=>{
+    if(hasFaceIdRegistered() && await faceIdAvailable()){
+      document.getElementById('faceIdUnlockBtn').style.display = 'block';
+      document.getElementById('faceIdUnlockBtn').addEventListener('click', tryFaceIdUnlock);
+    }
+  })();
 
   async function tryUnlock(){
     const errEl = document.getElementById('lockError');
@@ -735,7 +714,6 @@
     const h = await derivePasswordHash(val);
     if(h === PW_TARGET_HEX){
       lockFailedAttempts = 0;
-      trustThisDeviceForAWhile();
       unlockNow();
     } else {
       lockFailedAttempts++;
@@ -1563,6 +1541,16 @@
   }
   document.querySelector('[data-close="modalScan"]').addEventListener('click', stopScanner);
   $('#modalScan').addEventListener('click', (e)=>{ if(e.target.id==='modalScan') stopScanner(); });
+
+  // Spegne sempre la fotocamera quando l'app va in background o viene chiusa,
+  // anche se non è stata chiusa con la X — evita che resti "agganciata" attiva
+  // e blocchi la pagina al riavvio successivo.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden' && scannerCtrl){ stopScanner(); }
+  });
+  window.addEventListener('pagehide', ()=>{
+    if(scannerCtrl){ stopScanner(); }
+  });
 
   let lastScanned = null;
   async function lookupBarcodeAndRender(code, statusEl, resultWrapEl, closeModalId){
