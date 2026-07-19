@@ -602,6 +602,15 @@
 (function(){
   "use strict";
 
+  // Su iOS, quando riapri l'app dopo averla messa in background, a volte Safari
+  // la ripristina "congelata" da una cache invece di ricaricarla — questo forza
+  // sempre un ricaricamento pulito in quel caso, per evitare schermate bloccate.
+  window.addEventListener('pageshow', function(event){
+    if(event.persisted){
+      window.location.reload();
+    }
+  });
+
   /* ---------- blocco con password (PBKDF2, più resistente al tentativo di forzatura offline) ---------- */
   const PW_SALT_HEX = '0046e5165333445d20bfd4ed3821c847';
   const PW_ITERATIONS = 150000;
