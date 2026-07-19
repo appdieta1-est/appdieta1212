@@ -703,12 +703,13 @@
   if(isDeviceTrusted()){
     unlockNow();
   } else {
-    // se Face ID è già configurato su questo telefono, prova subito, altrimenti mostra solo il PIN
+    // se Face ID è già configurato su questo telefono, mostra il pulsante ma parte SOLO al tocco
+    // (mai in automatico: i browser richiedono un gesto utente reale per WebAuthn, altrimenti
+    // il prompt può restare "in sospeso" e bloccare la pagina)
     (async()=>{
       if(hasFaceIdRegistered() && await faceIdAvailable()){
         document.getElementById('faceIdUnlockBtn').style.display = 'block';
         document.getElementById('faceIdUnlockBtn').addEventListener('click', tryFaceIdUnlock);
-        await tryFaceIdUnlock(); // tentativo automatico all'apertura
       }
     })();
   }
