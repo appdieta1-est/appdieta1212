@@ -42,8 +42,7 @@
 
   header.top{
     position:sticky; top:0; z-index:20;
-    background:linear-gradient(180deg, rgba(0,0,0,0.98), rgba(0,0,0,0.94));
-    backdrop-filter: blur(6px);
+    background:#000000;
     padding: calc(18px + env(safe-area-inset-top)) 18px 12px;
     border-bottom:1px solid var(--line);
     box-shadow: 0 1px 24px rgba(139,92,246,0.12);
@@ -119,6 +118,13 @@
     background:linear-gradient(135deg, var(--amber), var(--amber-2)); color:#fff; font-size:15.5px; line-height:1;
     display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px var(--glow);
   }
+  .qty-edit-btn{
+    width:26px; height:26px; border-radius:50%; flex-shrink:0; margin-left:8px;
+    background:none; border:1px solid var(--line); color:var(--amber);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .qty-edit-btn:active{ background:var(--surface-2); border-color:var(--amber); }
   .extra-entry .eyebrow{ color:var(--rust); font-size:9px; }
   .entry{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px dashed var(--line); }
   .entry:last-child{border-bottom:none;}
@@ -167,7 +173,7 @@
 
   nav.tabbar{
     position:fixed; bottom:14px; left:14px; right:14px; z-index:30;
-    background:rgba(0,0,0,0.92); backdrop-filter:blur(10px);
+    background:#0a0710;
     border:1px solid var(--line);
     border-radius:999px;
     box-shadow:0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(139,92,246,0.10);
@@ -460,15 +466,43 @@
     <div class="off-result" style="margin-top:4px;"><div class="pname" id="manualMealLabel">—</div></div>
     <label class="field">Nome</label>
     <input type="text" id="manualName" placeholder="es. Insalata di quinoa">
+
+    <label class="field">Valori nutrizionali per 100g</label>
     <div class="grid4">
-      <div><label class="field">Kcal</label><input type="number" id="manualKcal" placeholder="0"></div>
-      <div><label class="field">Prot. g</label><input type="number" id="manualProt" placeholder="0"></div>
-      <div><label class="field">Carb. g</label><input type="number" id="manualCarb" placeholder="0"></div>
-      <div><label class="field">Grassi g</label><input type="number" id="manualFat" placeholder="0"></div>
+      <div><label class="field" style="margin-top:0; font-size:11px;">Kcal</label><input type="number" id="manualKcal100" placeholder="0"></div>
+      <div><label class="field" style="margin-top:0; font-size:11px;">Prot. g</label><input type="number" id="manualProt100" placeholder="0"></div>
+      <div><label class="field" style="margin-top:0; font-size:11px;">Carb. g</label><input type="number" id="manualCarb100" placeholder="0"></div>
+      <div><label class="field" style="margin-top:0; font-size:11px;">Grassi g</label><input type="number" id="manualFat100" placeholder="0"></div>
     </div>
-    <label class="field">Nota libera (facoltativa — es. "pranzo fuori, porzione abbondante")</label>
-    <textarea id="manualNote" rows="2" placeholder="Scrivi qui se non conosci i valori esatti..."></textarea>
+
+    <label class="field">Quantità mangiata (g)</label>
+    <input type="number" id="manualQty" value="100" min="1">
+
+    <div class="off-result" style="margin-top:12px;">
+      <div class="eyebrow" style="margin:0 0 6px;">Totale calcolato per questa quantità</div>
+      <div class="pname" id="manualComputedPreview">0 kcal · P 0g · C 0g · G 0g</div>
+    </div>
+
+    <label class="field">Nota libera (facoltativa)</label>
+    <textarea id="manualNote" rows="2" placeholder="Scrivi qui se vuoi aggiungere dettagli..."></textarea>
     <button class="btn primary block" style="margin-top:16px;" id="manualSaveBtn">Aggiungi al diario</button>
+  </div>
+</div>
+
+<!-- EDIT PLAN QTY MODAL -->
+<div class="modal-backdrop" id="modalEditQty">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" data-close="modalEditQty">✕</button>
+    <div class="modal-handle"></div>
+    <h2 id="editQtyName">Modifica grammi</h2>
+    <label class="field" style="margin-top:0;">Grammi</label>
+    <input type="number" id="editQtyInput" min="1">
+    <div class="off-result" style="margin-top:12px;">
+      <div class="eyebrow" style="margin:0 0 6px;">Macro ricalcolate</div>
+      <div class="pname" id="editQtyPreview">0 kcal · P 0g · C 0g · G 0g</div>
+    </div>
+    <button class="btn primary block" style="margin-top:16px;" id="editQtySaveBtn">Salva</button>
+    <button class="btn ghost block" style="margin-top:8px;" id="editQtyResetBtn">Ripristina grammi originali</button>
   </div>
 </div>
 
@@ -1067,6 +1101,7 @@
   let targets = { kcal:1715, prot:100, carb:230, fat:46 }; // media settimanale calcolata dal piano caricato
   let foodEntries = [];
   let checkedMap = {};
+  let planQtyOverride = {}; // { itemId: nuoviGrammi } per il giorno corrente
   let workoutEntries = [];
   let pendingMealTarget = 'Colazione'; // pasto a cui si sta aggiungendo (determinato dal + toccato)
   let quickFoodSel = null;
@@ -1297,12 +1332,24 @@
     return activePlan[key] || PLAN_TEMPLATE[key] || [];
   }
 
+  // Calcola le macro effettive di un alimento del piano, applicando l'eventuale
+  // modifica dei grammi fatta dall'utente per oggi (ricalcolo proporzionale).
+  function effectiveItemMacros(it){
+    const override = planQtyOverride[it.id];
+    if(override == null || !it.qty || it.qty <= 0){
+      return { qty: it.qty, kcal: it.kcal||0, prot: it.prot||0, carb: it.carb||0, fat: it.fat||0 };
+    }
+    const factor = override / it.qty;
+    return { qty: override, kcal:(it.kcal||0)*factor, prot:(it.prot||0)*factor, carb:(it.carb||0)*factor, fat:(it.fat||0)*factor };
+  }
+
   function sumAll(){
     const totals = {kcal:0,prot:0,carb:0,fat:0};
     planItemsForDay().forEach(block=>{
       block.items.forEach(it=>{
         if(checkedMap[it.id]){
-          totals.kcal += it.kcal||0; totals.prot += it.prot||0; totals.carb += it.carb||0; totals.fat += it.fat||0;
+          const m = effectiveItemMacros(it);
+          totals.kcal += m.kcal; totals.prot += m.prot; totals.carb += m.carb; totals.fat += m.fat;
         }
       });
     });
@@ -1340,10 +1387,10 @@
       html += `<div class="empty">Nessun piano per questo giorno</div>`;
     } else {
       blocks.forEach((block, bi)=>{
-        const checkedKcal = block.items.reduce((a,it)=>a + (checkedMap[it.id] ? (it.kcal||0) : 0), 0);
+        const checkedKcal = block.items.reduce((a,it)=>a + (checkedMap[it.id] ? effectiveItemMacros(it).kcal : 0), 0);
         const extraForBlock = foodEntries.filter(e=>e.meal===block.label);
         const extraKcal = extraForBlock.reduce((a,e)=>a+(e.kcal||0),0);
-        const totalKcal = block.items.reduce((a,it)=>a + (it.kcal||0), 0) + extraForBlock.reduce((a,e)=>a+(e.kcal||0),0);
+        const totalKcal = block.items.reduce((a,it)=>a + effectiveItemMacros(it).kcal, 0) + extraForBlock.reduce((a,e)=>a+(e.kcal||0),0);
         html += `<div class="meal-group">
           <div class="meal-title">
             <span>${escapeHtml(block.label)}</span>
@@ -1354,14 +1401,18 @@
           </div>`;
         block.items.forEach(it=>{
           const on = !!checkedMap[it.id];
-          const qtyStr = it.qty ? `${it.qty}${it.unit==='g'?'g':' '+it.unit}` : (it.unit||'');
+          const eff = effectiveItemMacros(it);
+          const edited = planQtyOverride[it.id] != null;
+          const qtyStr = eff.qty ? `${eff.qty}${it.unit==='g'?'g':' '+it.unit}` : (it.unit||'');
+          const canEdit = it.qty && it.qty > 0;
           html += `<div class="plan-row ${on?'checked':''}" data-id="${it.id}">
             <div class="checkbox ${on?'on':''}">${on?'✓':''}</div>
             <div class="info">
               <div class="name">${escapeHtml(it.name)}</div>
-              <div class="meta">${escapeHtml(qtyStr)}</div>
+              <div class="meta">${escapeHtml(qtyStr)}${edited?' <span style="color:var(--amber);">(modificato)</span>':''}</div>
             </div>
-            <div class="kcal">${Math.round(it.kcal||0)} kcal</div>
+            <div class="kcal">${Math.round(eff.kcal)} kcal</div>
+            ${canEdit ? `<button class="qty-edit-btn" data-edit-id="${it.id}" title="Modifica grammi"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>` : ''}
           </div>`;
         });
         extraForBlock.forEach(e=>{
@@ -1391,6 +1442,12 @@
         await storeSet('checked:'+fmtDate(currentDate), checkedMap);
         renderPlan();
         renderTotals();
+      });
+    });
+    $$('.qty-edit-btn', wrap).forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openEditQtyModal(btn.dataset.editId);
       });
     });
     $$('.meal-add-btn', wrap).forEach(btn=>{
@@ -1446,6 +1503,54 @@
   function renderDiario(){ renderTotals(); renderPlan(); }
 
   /* ---------- menu "+" per pasto ---------- */
+  /* ---------- modifica grammi di un alimento del piano ---------- */
+  let editQtyItemId = null;
+  function findPlanItemById(id){
+    for(const block of planItemsForDay()){
+      const found = block.items.find(it=>it.id===id);
+      if(found) return found;
+    }
+    return null;
+  }
+  function updateEditQtyPreview(it){
+    const qty = Number($('#editQtyInput').value) || 0;
+    const factor = it.qty ? (qty / it.qty) : 0;
+    const kcal = (it.kcal||0)*factor, prot=(it.prot||0)*factor, carb=(it.carb||0)*factor, fat=(it.fat||0)*factor;
+    $('#editQtyPreview').textContent = `${Math.round(kcal)} kcal · P ${prot.toFixed(1)}g · C ${carb.toFixed(1)}g · G ${fat.toFixed(1)}g`;
+  }
+  function openEditQtyModal(itemId){
+    const it = findPlanItemById(itemId);
+    if(!it) return;
+    editQtyItemId = itemId;
+    $('#editQtyName').textContent = it.name;
+    const current = planQtyOverride[itemId] != null ? planQtyOverride[itemId] : it.qty;
+    $('#editQtyInput').value = current;
+    updateEditQtyPreview(it);
+    $('#editQtyInput').oninput = ()=>updateEditQtyPreview(it);
+    openModal('modalEditQty');
+  }
+  $('#editQtySaveBtn').addEventListener('click', async ()=>{
+    const it = findPlanItemById(editQtyItemId);
+    if(!it) return;
+    const newQty = Number($('#editQtyInput').value);
+    if(!newQty || newQty <= 0){ toast('Inserisci un valore valido'); return; }
+    if(newQty === it.qty){ delete planQtyOverride[editQtyItemId]; }
+    else { planQtyOverride[editQtyItemId] = newQty; }
+    await storeSet('planqty:'+fmtDate(currentDate), planQtyOverride);
+    closeModal('modalEditQty');
+    renderDiario();
+    toast('Grammi aggiornati');
+  });
+  $('#editQtyResetBtn').addEventListener('click', async ()=>{
+    const it = findPlanItemById(editQtyItemId);
+    if(!it) return;
+    delete planQtyOverride[editQtyItemId];
+    await storeSet('planqty:'+fmtDate(currentDate), planQtyOverride);
+    closeModal('modalEditQty');
+    renderDiario();
+    toast('Ripristinati i grammi originali');
+  });
+
   function openAddMenu(mealLabel){
     pendingMealTarget = mealLabel;
     $('#addMenuMealLabel').textContent = mealLabel;
@@ -1479,25 +1584,52 @@
   });
 
   let manualPrefill = null;
+  function updateManualPreview(){
+    const kcal100 = Number($('#manualKcal100').value)||0;
+    const prot100 = Number($('#manualProt100').value)||0;
+    const carb100 = Number($('#manualCarb100').value)||0;
+    const fat100 = Number($('#manualFat100').value)||0;
+    const qty = Number($('#manualQty').value)||0;
+    const factor = qty/100;
+    const kcal = kcal100*factor, prot = prot100*factor, carb = carb100*factor, fat = fat100*factor;
+    $('#manualComputedPreview').textContent = `${Math.round(kcal)} kcal · P ${prot.toFixed(1)}g · C ${carb.toFixed(1)}g · G ${fat.toFixed(1)}g`;
+  }
+  $('#manualKcal100').addEventListener('input', updateManualPreview);
+  $('#manualProt100').addEventListener('input', updateManualPreview);
+  $('#manualCarb100').addEventListener('input', updateManualPreview);
+  $('#manualFat100').addEventListener('input', updateManualPreview);
+  $('#manualQty').addEventListener('input', updateManualPreview);
+
   function openManualAddModal(){
     manualPrefill = null;
     $('#manualTitle').textContent = 'Aggiungi alimento';
     $('#manualMealLabel').textContent = pendingMealTarget;
-    $('#manualName').value=''; $('#manualKcal').value=''; $('#manualProt').value='';
-    $('#manualCarb').value=''; $('#manualFat').value=''; $('#manualNote').value='';
+    $('#manualName').value='';
+    $('#manualKcal100').value=''; $('#manualProt100').value='';
+    $('#manualCarb100').value=''; $('#manualFat100').value='';
+    $('#manualQty').value = 100;
+    $('#manualNote').value='';
+    updateManualPreview();
     openModal('modalManual');
   }
   $('#manualSaveBtn').addEventListener('click', async ()=>{
     const name = $('#manualName').value.trim();
     const note = $('#manualNote').value.trim();
     if(!name && !note){ toast('Scrivi almeno un nome o una nota'); return; }
+    const kcal100 = Number($('#manualKcal100').value)||0;
+    const prot100 = Number($('#manualProt100').value)||0;
+    const carb100 = Number($('#manualCarb100').value)||0;
+    const fat100 = Number($('#manualFat100').value)||0;
+    const qty = Number($('#manualQty').value)||100;
+    const factor = qty/100;
     const entry = {
       id: uid(), meal: pendingMealTarget,
       name: name || note.slice(0,40) || 'Voce libera',
-      kcal: Number($('#manualKcal').value)||0,
-      prot: Number($('#manualProt').value)||0,
-      carb: Number($('#manualCarb').value)||0,
-      fat: Number($('#manualFat').value)||0,
+      qty,
+      kcal: kcal100*factor,
+      prot: prot100*factor,
+      carb: carb100*factor,
+      fat: fat100*factor,
       note: note || null,
       source: manualPrefill ? 'barcode' : 'manual'
     };
@@ -1604,8 +1736,12 @@
           manualPrefill = null;
           $('#manualTitle').textContent = 'Aggiungi alimento';
           $('#manualMealLabel').textContent = pendingMealTarget;
-          $('#manualName').value=''; $('#manualKcal').value=''; $('#manualProt').value='';
-          $('#manualCarb').value=''; $('#manualFat').value=''; $('#manualNote').value='';
+          $('#manualName').value='';
+          $('#manualKcal100').value=''; $('#manualProt100').value='';
+          $('#manualCarb100').value=''; $('#manualFat100').value='';
+          $('#manualQty').value = 100;
+          $('#manualNote').value='';
+          updateManualPreview();
           openModal('modalManual');
         });
         return;
@@ -1631,14 +1767,16 @@
       $('#useOffBtn').addEventListener('click', ()=>{
         closeModal(closeModalId);
         manualPrefill = per100;
-        $('#manualTitle').textContent = 'Conferma quantità';
+        $('#manualTitle').textContent = 'Quanti grammi ne hai mangiati?';
         $('#manualMealLabel').textContent = pendingMealTarget;
         $('#manualName').value = p.product_name || 'Prodotto scansionato';
-        $('#manualKcal').value = Math.round(per100.kcal);
-        $('#manualProt').value = per100.prot.toFixed(1);
-        $('#manualCarb').value = per100.carb.toFixed(1);
-        $('#manualFat').value = per100.fat.toFixed(1);
-        $('#manualNote').value = 'Valori per 100g — modifica in base alla porzione reale';
+        $('#manualKcal100').value = Math.round(per100.kcal);
+        $('#manualProt100').value = per100.prot.toFixed(1);
+        $('#manualCarb100').value = per100.carb.toFixed(1);
+        $('#manualFat100').value = per100.fat.toFixed(1);
+        $('#manualQty').value = 100;
+        $('#manualNote').value = '';
+        updateManualPreview();
         openModal('modalManual');
       });
     }catch(err){
@@ -2126,6 +2264,7 @@
     const dstr = fmtDate(currentDate);
     foodEntries = await storeGet('food:'+dstr, []);
     checkedMap = await storeGet('checked:'+dstr, {});
+    planQtyOverride = await storeGet('planqty:'+dstr, {});
     workoutEntries = await storeGet('workouts:'+dstr, []);
     await loadWaterDay();
     renderAll();
