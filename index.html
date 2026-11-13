@@ -2,6 +2,8 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https://raw.githubusercontent.com https://wger.de https://www.themealdb.com https://*.openfoodfacts.org; connect-src https://raw.githubusercontent.com https://wger.de https://world.openfoodfacts.org https://www.themealdb.com https://cdnjs.cloudflare.com; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -14,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
@@ -166,6 +168,8 @@
   .modal-close{position:absolute; top:14px; right:18px; background:none; border:none; color:var(--ink-dim); font-size:20px;}
 
   #scanner-region{width:100%; border-radius:12px; overflow:hidden; background:#000; min-height:220px;}
+  #scanner-region video{ width:100% !important; height:auto !important; max-height:60vh; object-fit:contain !important; display:block; }
+  .scan-tip{ font-size:12.5px; color:var(--ink-dim); text-align:center; margin-top:6px; line-height:1.4; }
   .scan-status{font-family:var(--mono); font-size:13.5px; color:var(--ink-dim); text-align:center; margin-top:10px;}
   .off-result{background:var(--surface-2); border-radius:12px; padding:12px; margin-top:12px; border:1px solid var(--line);}
   .off-result .pname{font-size:15px; font-weight:600;}
@@ -240,6 +244,10 @@
   .ex-card .ex-thumb svg{ width:100%; height:100%; }
   .ex-card .ex-name{ font-size:15.5px; font-weight:600; }
   .ex-card .ex-muscle{ font-size:12.5px; color:var(--ink-dim); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+  .fx-anim{ position:relative; width:100%; max-width:300px; aspect-ratio:3/2; margin:8px auto 0; border-radius:12px; overflow:hidden; background:#fff; }
+  .fx-anim img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  .fx-anim .fx-b{ animation: fxSwap 1.6s steps(1) infinite; }
+  @keyframes fxSwap{ 0%{opacity:0} 50%{opacity:1} }
   .ex-illustration{ width:100%; background:var(--surface-2); border-radius:14px; padding:12px; margin-bottom:14px; }
   .ex-illustration svg{ width:100%; height:auto; display:block; }
   .ex-section-title{ font-family:var(--mono); font-size:12.5px; text-transform:uppercase; letter-spacing:1.5px; color:var(--sage); margin:16px 0 6px; }
@@ -328,7 +336,7 @@
 
     <div class="card">
       <div class="btnrow">
-        <button class="btn block" id="btnImportPlan" style="flex:1;">🔄 Carica nuovo piano alimentare (PDF)</button>
+        <button class="btn block" id="btnImportPlan" style="flex:1;">📄 Carica la dieta (PDF o Word)</button>
       </div>
       <div id="planSourceNote" style="margin-top:8px; font-size:12.5px; color:var(--ink-dim);"></div>
     </div>
@@ -340,17 +348,18 @@
   <!-- ALLENAMENTI -->
   <section class="tab" id="tab-allenamenti">
     <div class="card">
+      <h3>🏋️ Allenamento <span class="eyebrow" id="workoutDayLabel" style="margin:0;"></span></h3>
+      <div id="workoutList"></div>
+      <button class="btn primary block" id="btnAddWorkout" style="margin-top:12px;">➕ Registra esercizio</button>
+    </div>
+    <div class="card">
       <h3>📏 I miei massimali</h3>
-      <p style="font-size:13px; color:var(--ink-dim); margin-top:-6px;">Servono anche a calcolare i pesi in percentuale quando registri un allenamento nel Diario.</p>
+      <p style="font-size:13px; color:var(--ink-dim); margin-top:-6px;">Servono a calcolare i pesi in percentuale quando registri un esercizio (es. 4x6 all'80%).</p>
       <div id="maxliftsInlineList" style="margin-top:6px;"></div>
       <button class="btn primary block" id="btnAddMaxlift" style="margin-top:12px;">➕ Aggiungi massimale</button>
     </div>
     <div class="card">
       <button class="btn block" id="btnGoToProgressiFromAllenamenti">📈 Vedi i tuoi progressi</button>
-    </div>
-    <button id="btnAddWorkout" style="display:none;"></button>
-    <div style="display:none;">
-      <div id="workoutList"></div>
     </div>
   </section>
 
@@ -435,12 +444,12 @@
     <button class="modal-close" data-close="modalImportPlan">✕</button>
     <div class="modal-handle"></div>
     <h2>Carica nuovo piano alimentare</h2>
-    <p style="font-size:14.5px; color:var(--ink-dim); margin-top:-6px;">Carica il PDF della tua nuova dieta: leggo automaticamente giorni, pasti e alimenti e sostituisco il piano attuale.</p>
-    <input type="file" id="planFileInput" accept="application/pdf">
+    <p style="font-size:14.5px; color:var(--ink-dim); margin-top:-6px;">Carica la dieta in PDF o Word (.doc / .docx): leggo giorni, pasti e alimenti e calcolo calorie e macro giornaliere. Se nel file mancano i valori nutrizionali, li stimo da una tabella di alimenti comuni.</p>
+    <input type="file" id="planFileInput" accept="application/pdf,.pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
     <div class="scan-status" id="importStatus" style="text-align:left; margin-top:12px;"></div>
     <div id="importPreview"></div>
-    <button class="btn primary block" id="importConfirmBtn" style="margin-top:16px; display:none;">Conferma e sostituisci piano</button>
-    <button class="btn block" id="planRestoreBtn" style="margin-top:10px; display:none;">Ripristina piano di esempio</button>
+    <button class="btn primary block" id="importConfirmBtn" style="margin-top:16px; display:none;">Conferma e calcola gli obiettivi</button>
+    <button class="btn block" id="planRestoreBtn" style="margin-top:10px; display:none;"><!--RESTORE_LABEL-->Torna alla dieta iniziale<!--END_RESTORE_LABEL--></button>
   </div>
 </div>
 
@@ -467,8 +476,12 @@
     <h2>Scansiona codice a barre</h2>
     <div id="scanner-region"></div>
     <div class="scan-status" id="scanStatus">Inquadra il codice a barre del prodotto</div>
+    <div class="scan-tip">Tieni il telefono a circa 15–20 cm dal codice, non troppo vicino. Se non mette a fuoco, prova <b>Cambia obiettivo</b>.</div>
+    <div class="btnrow" style="margin-top:8px;">
+      <button class="btn block" id="scanSwitchCam" style="display:none;">🔄 Cambia obiettivo</button>
+    </div>
     <div id="zoomControlWrap" style="display:none; margin-top:10px;">
-      <label class="field" style="margin-top:0;">Zoom fotocamera (se l'immagine è troppo ravvicinata, sposta a sinistra)</label>
+      <label class="field" style="margin-top:0;">Zoom: se l'immagine è troppo ravvicinata, sposta tutto a sinistra</label>
       <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1">
     </div>
     <div id="offResultWrap"></div>
@@ -498,7 +511,8 @@
     <label class="field" style="margin-top:0;">Aggiungo a</label>
     <div class="off-result" style="margin-top:4px;"><div class="pname" id="quickMealLabel">—</div></div>
     <label class="field">Alimento</label>
-    <div class="chips" id="quickFoodChips"></div>
+    <div id="quickDietNote" style="font-size:12.5px;color:var(--ink-dim);margin:-2px 0 6px;"></div>
+    <div class="chips" id="quickFoodChips" style="max-height:220px;overflow-y:auto;"></div>
     <label class="field">Quantità (g)</label>
     <input type="number" id="quickQty" value="100" min="1">
     <button class="btn primary block" style="margin-top:16px;" id="quickSaveBtn">Aggiungi al diario</button>
@@ -582,7 +596,8 @@
     <h2>Registra allenamento</h2>
 
     <label class="field">Esercizio / attività</label>
-    <input type="text" id="workoutExercise" list="strengthExerciseList" placeholder="es. Stacco da terra, Corsa, Plank...">
+    <input type="text" id="workoutExercise" autocomplete="off" placeholder="es. Stacco da terra, Corsa, Plank...">
+    <div class="chips" id="workoutExSuggest" style="margin-top:6px;"></div>
 
     <div id="workoutInstructionsBox"></div>
 
@@ -607,6 +622,8 @@
         <div class="pbrand" id="workoutComputedNote"></div>
       </div>
     </div>
+
+    <div id="workoutSetsBox"></div>
 
     <div class="grid2">
       <div><label class="field">Durata (min, facoltativo)</label><input type="number" id="workoutDuration" placeholder="45"></div>
@@ -692,7 +709,6 @@
   </div>
 </div>
 
-<datalist id="strengthExerciseList"></datalist>
 
 <!-- MAXLIFT ADD/EDIT MODAL -->
 <div class="modal-backdrop" id="modalMaxlifts">
@@ -701,7 +717,8 @@
     <div class="modal-handle"></div>
     <h2 id="maxliftModalTitle">Aggiungi massimale</h2>
     <label class="field" style="margin-top:0;">Esercizio</label>
-    <input type="text" id="maxliftExercise" list="strengthExerciseList" placeholder="es. Stacco da terra">
+    <input type="text" id="maxliftExercise" autocomplete="off" placeholder="es. Stacco da terra">
+    <div class="chips" id="maxliftExSuggest" style="margin-top:6px;"></div>
     <label class="field">Massimale (kg)</label>
     <input type="number" id="maxliftWeight" step="0.5" placeholder="110">
     <button class="btn primary block" style="margin-top:16px;" id="maxliftSaveBtn">Salva massimale</button>
@@ -721,21 +738,24 @@
     }
   });
 
+  /* ---------- configurazione di questa app ---------- */
+  const APP = /*APP_CONFIG*/{"prefix": "logbook_v1_", "faceIdKey": "logbook_faceid_cred_id_v2", "userPinKey": "logbook_esther_user_pin_v2", "forcePinChange": true, "ownerMatch": "esther|ester", "hasStarterPlan": true}/*END_APP_CONFIG*/;
+
   /* ---------- blocco con password (PBKDF2, più resistente al tentativo di forzatura offline) ---------- */
-  const PW_SALT_HEX = '0046e5165333445d20bfd4ed3821c847';
+  const PW_SALT_HEX = '5d2ff40ad7cc1599bd8600299fced2e1';
   const PW_ITERATIONS = 150000;
-  const PW_TARGET_HEX = 'f8522bf05510fc6ed41a728a0d510145b3ec11d2d60bd9ffcf49c8208be889b5';
+  const PW_TARGET_HEX = '90d2a1ac42e44d79304c496c903cb85c696994ac834425559ea91f96f680702e';
 
   function hexToBytes(hex){
     const bytes = new Uint8Array(hex.length/2);
     for(let i=0;i<bytes.length;i++) bytes[i] = parseInt(hex.substr(i*2,2),16);
     return bytes;
   }
-  async function derivePasswordHash(password){
+  async function derivePasswordHash(password, saltHex){
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits(
-      { name:'PBKDF2', salt: hexToBytes(PW_SALT_HEX), iterations: PW_ITERATIONS, hash:'SHA-256' },
+      { name:'PBKDF2', salt: hexToBytes(saltHex || PW_SALT_HEX), iterations: PW_ITERATIONS, hash:'SHA-256' },
       keyMaterial, 256
     );
     return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -755,7 +775,7 @@
   }
 
   /* ---------- Face ID / Touch ID (WebAuthn) ---------- */
-  const FACEID_KEY = 'logbook_faceid_cred_id';
+  const FACEID_KEY = APP.faceIdKey;
   function bytesToBase64url(bytes){
     let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
     return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -812,30 +832,104 @@
     }
   })();
 
+  /* PIN: al primo accesso vale il PIN temporaneo (PW_TARGET_HEX); appena inserito,
+     l'app chiede di scegliere un PIN personale, salvato solo su questo dispositivo
+     come hash PBKDF2 con un salt casuale. Da quel momento il PIN temporaneo non vale più. */
+  const USER_PIN_KEY = APP.userPinKey;
+  function getUserPin(){
+    try{ const v = JSON.parse(localStorage.getItem(USER_PIN_KEY)); return (v && v.salt && v.hash) ? v : null; }catch(e){ return null; }
+  }
+  function randomSaltHex(){
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');
+  }
+  function isWeakPin(pin){
+    return /^(\d)\1{5}$/.test(pin) || '0123456789'.includes(pin) || '9876543210'.includes(pin);
+  }
+  let lockMode = 'verify';   // 'verify' | 'new' | 'confirm'
+  let newPinCandidate = '';
+  function setLockText(sub, btn){
+    document.querySelector('#lockScreen .lock-sub').textContent = sub;
+    document.getElementById('lockSubmit').textContent = btn;
+  }
+  function failAttempt(errEl){
+    lockFailedAttempts++;
+    if(lockFailedAttempts >= 5){
+      const waitSeconds = Math.min(300, 15 * (lockFailedAttempts - 4)); // 15s, 30s, 45s... fino a 5 min
+      lockLockedUntil = Date.now() + waitSeconds*1000;
+      errEl.textContent = `Troppi tentativi errati. Riprova tra ${waitSeconds} secondi.`;
+    } else {
+      errEl.textContent = 'PIN errato, riprova.';
+    }
+  }
+
   async function tryUnlock(){
     const errEl = document.getElementById('lockError');
+    const input = document.getElementById('lockPassword');
+    const val = input.value;
+    input.value = '';
+
+    if(lockMode === 'new'){
+      if(val.length !== 6){ errEl.textContent = 'Il PIN deve avere 6 cifre.'; return; }
+      if(isWeakPin(val)){ errEl.textContent = 'PIN troppo semplice, scegline un altro.'; return; }
+      if(await derivePasswordHash(val) === PW_TARGET_HEX){ errEl.textContent = 'Scegli un PIN diverso da quello temporaneo.'; return; }
+      newPinCandidate = val;
+      lockMode = 'confirm';
+      errEl.textContent = '';
+      setLockText('Inserisci di nuovo il PIN per confermarlo', 'Conferma PIN');
+      input.focus();
+      return;
+    }
+    if(lockMode === 'confirm'){
+      if(val !== newPinCandidate){
+        newPinCandidate = '';
+        lockMode = 'new';
+        errEl.textContent = 'I due PIN non coincidono, riprova.';
+        setLockText('Scegli il tuo PIN personale (6 cifre)', 'Continua');
+        input.focus();
+        return;
+      }
+      errEl.textContent = 'Salvo il PIN...';
+      const salt = randomSaltHex();
+      const hash = await derivePasswordHash(val, salt);
+      try{ localStorage.setItem(USER_PIN_KEY, JSON.stringify({salt, hash})); }
+      catch(e){ errEl.textContent = 'Non riesco a salvare il PIN su questo dispositivo.'; return; }
+      newPinCandidate = '';
+      unlockNow();
+      setTimeout(()=>{ try{ toast('PIN personale salvato'); }catch(e){} }, 300);
+      return;
+    }
+
+    // lockMode === 'verify'
     const remaining = lockRemainingSeconds();
     if(remaining > 0){
       errEl.textContent = `Troppi tentativi errati. Riprova tra ${remaining} secondi.`;
       return;
     }
-    const val = document.getElementById('lockPassword').value;
     errEl.textContent = 'Verifica in corso...';
-    const h = await derivePasswordHash(val);
-    if(h === PW_TARGET_HEX){
-      lockFailedAttempts = 0;
-      unlockNow();
-    } else {
-      lockFailedAttempts++;
-      document.getElementById('lockPassword').value = '';
-      if(lockFailedAttempts >= 5){
-        const waitSeconds = Math.min(300, 15 * (lockFailedAttempts - 4)); // 15s, 30s, 45s... fino a 5 min
-        lockLockedUntil = Date.now() + waitSeconds*1000;
-        errEl.textContent = `Troppi tentativi errati. Riprova tra ${waitSeconds} secondi.`;
+    const userPin = getUserPin();
+    if(userPin){
+      if(await derivePasswordHash(val, userPin.salt) === userPin.hash){
+        lockFailedAttempts = 0;
+        unlockNow();
       } else {
-        errEl.textContent = 'Password errata, riprova.';
+        failAttempt(errEl);
       }
+      return;
     }
+    if(await derivePasswordHash(val) === PW_TARGET_HEX){
+      lockFailedAttempts = 0;
+      if(!APP.forcePinChange){ unlockNow(); return; }
+      lockMode = 'new';
+      errEl.textContent = '';
+      setLockText('PIN temporaneo corretto. Ora scegli il tuo PIN personale (6 cifre)', 'Continua');
+      input.focus();
+    } else {
+      failAttempt(errEl);
+    }
+  }
+  if(APP.forcePinChange && !getUserPin()){
+    setLockText('Primo accesso: inserisci il PIN temporaneo a 6 cifre', 'Sblocca');
   }
   document.getElementById('lockSubmit').addEventListener('click', tryUnlock);
   document.getElementById('lockPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') tryUnlock(); });
@@ -858,9 +952,12 @@
   function closeModal(id){ $('#'+id).classList.remove('show'); }
   $$('.modal-close').forEach(b => b.addEventListener('click', ()=>closeModal(b.dataset.close)));
   $$('.modal-backdrop').forEach(b => b.addEventListener('click', (e)=>{ if(e.target===b) b.classList.remove('show'); }));
+  function safeMealImg(u){
+    try{ const url = new URL(String(u||'')); return (url.protocol==='https:' && url.hostname==='www.themealdb.com') ? url.href : ''; }catch(e){ return ''; }
+  }
   function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  const LOCAL_PREFIX = 'logbook_v1_';
+  const LOCAL_PREFIX = APP.prefix;
   function hasClaudeStorage(){ return typeof window.storage !== 'undefined' && window.storage; }
 
   async function storeGet(key, fallback){
@@ -904,7 +1001,7 @@
 
   function mk(name, qty, unit, kcal, prot, carb, fat){ return {name, qty, unit: unit||null, kcal, prot, carb, fat}; }
 
-  const RAW_PLAN = {
+  const RAW_PLAN = /*RAW_PLAN*/{
     lun: [
       ['Colazione', [mk('Affettato vegetale mopur',50,'g',117.09,16.5,3.9,3.9), mk('Formaggio delicapra',20,'g',74.2,4.6,0.0,6.0), mk('Pane integrale',80,'g',197.22,6.0,43.04,1.04), mk('Latte scremato',150,'g',54.6,5.4,7.95,0.3)]],
       ['Spuntino 1', [mk('Cracker integrali',25,'g',90.08,3.5,15.13,2.0)]],
@@ -953,7 +1050,7 @@
       ['Spuntino 2', [mk('Mirtilli',150,'g',45.72,0.9,10.35,0.3), mk('Mandorle',20,'g',111.63,3.2,0.8,10.3)]],
       ['Cena', [mk('Pesce spada',100,'g',110.46,16.9,1.0,4.2), mk('Patate',200,'g',172.2,4.2,36.0,2.0), mk('Olio extravergine oliva',10,'1 cucchiaio',93.0,0,0,10.0), mk('Cavolo nero',250,'g',120.09,8.95,17.78,1.8)]],
     ],
-  };
+  }/*END_RAW_PLAN*/; // dieta precaricata (vuota = si carica dal file)
 
   function buildTemplateFrom(rawPlanObj){
     const tpl = {};
@@ -1068,7 +1165,315 @@
     return { rawPlan, stats };
   }
 
+  /* ---------- import dieta da Word (.doc / .docx) ---------- */
+  // Lettore minimale di file Word 97-2003 (.doc): formato "Compound File" + piece table.
+  function readCfbStreams(buf){
+    const dv = new DataView(buf);
+    const u8 = new Uint8Array(buf);
+    const sig = [0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1];
+    if(!sig.every((b,i)=>u8[i]===b)) throw new Error('Non è un file .doc valido');
+    const secSize = 1 << dv.getUint16(0x1E, true);
+    const miniSecSize = 1 << dv.getUint16(0x20, true);
+    const firstDirSec = dv.getInt32(0x30, true);
+    const miniCutoff = dv.getUint32(0x38, true);
+    const firstMiniFatSec = dv.getInt32(0x3C, true);
+    const firstDifatSec = dv.getInt32(0x44, true);
+    const secOff = s => (s + 1) * secSize;
+    // DIFAT -> settori della FAT
+    const fatSecs = [];
+    for(let i=0;i<109;i++){ const s = dv.getInt32(0x4C + i*4, true); if(s >= 0) fatSecs.push(s); }
+    let d = firstDifatSec, guard = 0;
+    while(d >= 0 && guard++ < 10000){
+      const per = secSize/4 - 1;
+      for(let i=0;i<per;i++){ const s = dv.getInt32(secOff(d) + i*4, true); if(s >= 0) fatSecs.push(s); }
+      d = dv.getInt32(secOff(d) + per*4, true);
+    }
+    const fat = [];
+    fatSecs.forEach(s=>{ for(let i=0;i<secSize/4;i++) fat.push(dv.getInt32(secOff(s) + i*4, true)); });
+    function chain(start){
+      const out = []; let s = start, g = 0;
+      while(s >= 0 && g++ < 1e6){ out.push(s); s = fat[s]; }
+      return out;
+    }
+    function readChain(start){
+      const secs = chain(start);
+      const out = new Uint8Array(secs.length * secSize);
+      secs.forEach((s,i)=> out.set(u8.subarray(secOff(s), secOff(s)+secSize), i*secSize));
+      return out;
+    }
+    const dir = readChain(firstDirSec);
+    const ddv = new DataView(dir.buffer);
+    const entries = [];
+    for(let off=0; off + 128 <= dir.length; off += 128){
+      const nameLen = ddv.getUint16(off + 0x40, true);
+      let name = '';
+      for(let i=0;i<Math.max(0,nameLen/2-1);i++) name += String.fromCharCode(ddv.getUint16(off + i*2, true));
+      entries.push({ name, type: dir[off + 0x42], start: ddv.getInt32(off + 0x74, true), size: ddv.getUint32(off + 0x78, true) });
+    }
+    const root = entries[0];
+    const miniStream = root && root.start >= 0 ? readChain(root.start) : new Uint8Array(0);
+    let miniFat = [];
+    if(firstMiniFatSec >= 0){
+      const mf = readChain(firstMiniFatSec); const mdv = new DataView(mf.buffer);
+      for(let i=0;i<mf.length/4;i++) miniFat.push(mdv.getInt32(i*4, true));
+    }
+    function readStream(e){
+      if(e.size < miniCutoff){
+        const out = new Uint8Array(e.size); let s = e.start, pos = 0, g = 0;
+        while(s >= 0 && pos < e.size && g++ < 1e6){
+          const n = Math.min(miniSecSize, e.size - pos);
+          out.set(miniStream.subarray(s*miniSecSize, s*miniSecSize + n), pos);
+          pos += n; s = miniFat[s];
+        }
+        return out;
+      }
+      return readChain(e.start).subarray(0, e.size);
+    }
+    const streams = {};
+    entries.forEach(e=>{ if(e.type === 2 && e.name) streams[e.name] = readStream(e); });
+    return streams;
+  }
+
+  const CP1252_EXTRA = {0x80:'€',0x82:'‚',0x83:'ƒ',0x84:'„',0x85:'…',0x86:'†',0x87:'‡',0x88:'ˆ',0x89:'‰',0x8A:'Š',0x8B:'‹',0x8C:'Œ',0x8E:'Ž',0x91:'‘',0x92:'’',0x93:'“',0x94:'”',0x95:'•',0x96:'–',0x97:'—',0x98:'˜',0x99:'™',0x9A:'š',0x9B:'›',0x9C:'œ',0x9E:'ž',0x9F:'Ÿ'};
+
+  function docToText(buf){
+    const streams = readCfbStreams(buf);
+    const wd = streams['WordDocument'];
+    if(!wd) throw new Error('Documento Word non riconosciuto');
+    const wdv = new DataView(wd.buffer, wd.byteOffset, wd.byteLength);
+    const flags = wdv.getUint16(0x0A, true);
+    const table = streams[(flags & 0x0200) ? '1Table' : '0Table'];
+    if(!table) throw new Error('Tabella del documento mancante');
+    const fcClx = wdv.getUint32(0x01A2, true);
+    const lcbClx = wdv.getUint32(0x01A6, true);
+    const tdv = new DataView(table.buffer, table.byteOffset, table.byteLength);
+    let pos = fcClx;
+    while(pos < fcClx + lcbClx && table[pos] === 0x01){ pos += 3 + tdv.getUint16(pos+1, true); }
+    if(table[pos] !== 0x02) throw new Error('Struttura del testo non riconosciuta');
+    const lcb = tdv.getUint32(pos+1, true);
+    const plc = pos + 5;
+    const n = (lcb - 4) / 12;
+    let text = '';
+    for(let i=0;i<n;i++){
+      const cpStart = tdv.getUint32(plc + i*4, true);
+      const cpEnd = tdv.getUint32(plc + (i+1)*4, true);
+      let fc = tdv.getUint32(plc + (n+1)*4 + i*8 + 2, true);
+      const compressed = (fc & 0x40000000) !== 0;
+      const len = cpEnd - cpStart;
+      if(compressed){
+        fc = (fc & ~0x40000000) >>> 1;
+        for(let k=0;k<len;k++){ const b = wd[fc+k]; text += CP1252_EXTRA[b] || String.fromCharCode(b); }
+      } else {
+        for(let k=0;k<len;k++) text += String.fromCharCode(wdv.getUint16(fc + k*2, true));
+      }
+    }
+    // caratteri di controllo di Word -> a capo / pulizia
+    return text.replace(/[\r\x07\x0b\x0c]/g, '\n').replace(/[\x00-\x08\x0e-\x1f]/g, '');
+  }
+
+  // .docx: è uno zip; leggo word/document.xml con DecompressionStream (Safari 16.4+)
+  async function docxToText(buf){
+    const u8 = new Uint8Array(buf); const dv = new DataView(buf);
+    let eocd = -1;
+    for(let i=u8.length-22;i>=Math.max(0,u8.length-66000);i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+    if(eocd < 0) throw new Error('Non è un file .docx valido');
+    const count = dv.getUint16(eocd+10, true);
+    let p = dv.getUint32(eocd+16, true);
+    for(let i=0;i<count;i++){
+      const method = dv.getUint16(p+10, true), csize = dv.getUint32(p+20, true);
+      const nlen = dv.getUint16(p+28, true), xlen = dv.getUint16(p+30, true), clen = dv.getUint16(p+32, true);
+      const local = dv.getUint32(p+42, true);
+      const name = new TextDecoder().decode(u8.subarray(p+46, p+46+nlen));
+      if(name === 'word/document.xml'){
+        const lnl = dv.getUint16(local+26, true), lxl = dv.getUint16(local+28, true);
+        const data = u8.subarray(local+30+lnl+lxl, local+30+lnl+lxl+csize);
+        let xml;
+        if(method === 0) xml = new TextDecoder().decode(data);
+        else {
+          const ds = new DecompressionStream('deflate-raw');
+          const out = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+          xml = new TextDecoder().decode(out);
+        }
+        return xml
+          .replace(/<w:tab\/>/g,' ')
+          .replace(/<w:br[^>]*\/>/g,'\n')
+          .replace(/<\/w:p>/g,'\n')
+          .replace(/<\/w:tc>/g,'\n')
+          .replace(/<[^>]+>/g,'')
+          .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'");
+      }
+      p += 46 + nlen + xlen + clen;
+    }
+    throw new Error('Contenuto del .docx non trovato');
+  }
+
+  // Valori nutrizionali indicativi per 100 g (kcal, proteine, carboidrati, grassi) e peso di un pezzo.
+  // Le chiavi sono parole da cercare nel nome dell'alimento (la più specifica vince).
+  const FOOD_DB = [
+    ['pasta di semola integr', 'Pasta integrale', 340, 13.5, 66, 2.5],
+    ['pasta di semola', 'Pasta di semola', 353, 12.5, 71, 1.5],
+    ['pasta integr', 'Pasta integrale', 340, 13.5, 66, 2.5],
+    ['pasta', 'Pasta di semola', 353, 12.5, 71, 1.5],
+    ['fiocchi di avena', 'Fiocchi di avena', 372, 13, 60, 7],
+    ['avena', 'Fiocchi di avena', 372, 13, 60, 7],
+    ['yogurt fage', 'Yogurt greco 0%', 54, 10.3, 3, 0],
+    ['yogurt greco', 'Yogurt greco 0%', 54, 10.3, 3, 0],
+    ['yogurt', 'Yogurt bianco', 63, 5, 7, 1.5],
+    ['philadelphia protein', 'Philadelphia Protein', 90, 11.5, 4, 3],
+    ['philadelphia', 'Philadelphia', 225, 5.5, 4, 21],
+    ['gallette mais', 'Gallette di mais', 380, 8, 80, 3],
+    ['gallette', 'Gallette di riso', 380, 8, 80, 3],
+    ['petto pollo', 'Petto di pollo', 110, 23, 0, 1.2],
+    ['pollo', 'Petto di pollo', 110, 23, 0, 1.2],
+    ['tacchino', 'Tacchino', 107, 24, 0, 1.2],
+    ['suino', 'Suino magro', 143, 21, 0, 6],
+    ['maiale', 'Suino magro', 143, 21, 0, 6],
+    ['manzo', 'Manzo', 150, 21, 0, 7],
+    ['bresaola', 'Bresaola', 151, 32, 0.5, 2],
+    ['merluzzo', 'Merluzzo', 82, 18, 0, 0.7],
+    ['nasello', 'Nasello', 72, 17, 0, 0.4],
+    ['trota', 'Trota', 140, 20, 0, 6.6],
+    ['salmone', 'Salmone', 183, 20, 0, 11],
+    ['tonno', 'Tonno al naturale', 116, 26, 0, 1],
+    ['albume', 'Albume', 52, 11, 0.7, 0.2],
+    ['uovo', 'Uovo intero', 143, 12.6, 0.7, 9.5, 60, 'uovo', 'uova'],
+    ['uova', 'Uovo intero', 143, 12.6, 0.7, 9.5, 60, 'uovo', 'uova'],
+    ['proteine polvere', 'Proteine in polvere', 380, 80, 6, 5],
+    ['proteine', 'Proteine in polvere', 380, 80, 6, 5],
+    ['whey', 'Proteine in polvere', 380, 80, 6, 5],
+    ['olio', 'Olio extravergine oliva', 884, 0, 0, 100],
+    ['burro d arachidi', 'Burro di arachidi', 588, 25, 20, 50],
+    ['burro di arachidi', 'Burro di arachidi', 588, 25, 20, 50],
+    ['burro di mandorle', 'Burro di mandorle', 614, 21, 19, 56],
+    ['mandorle', 'Mandorle', 579, 21, 22, 50, 1.2, 'mandorla', 'mandorle'],
+    ['noci', 'Noci', 654, 15, 14, 65, 5, 'noce', 'noci'],
+    ['cioccolato', 'Cioccolato fondente', 580, 8, 45, 40],
+    ['ciocc', 'Cioccolato fondente', 580, 8, 45, 40],
+    ['marmellata', 'Marmellata', 250, 0.4, 62, 0.1],
+    ['miele', 'Miele', 304, 0.3, 82, 0],
+    ['zucchero', 'Zucchero', 400, 0, 100, 0],
+    ['corn flakes', 'Corn flakes', 378, 7, 84, 0.9],
+    ['latte vegetale', 'Latte vegetale', 40, 1, 6, 1.2],
+    ['latte parz', 'Latte parzialmente scremato', 46, 3.3, 4.9, 1.5],
+    ['latte scremato', 'Latte scremato', 34, 3.4, 5, 0.1],
+    ['latte', 'Latte parzialmente scremato', 46, 3.3, 4.9, 1.5],
+    ['farina', 'Farina', 340, 10, 72, 1],
+    ['pane', 'Pane', 270, 9, 55, 1.5],
+    ['riso', 'Riso basmati', 355, 7.5, 79, 0.6],
+    ['patate', 'Patate', 77, 2, 17, 0.1],
+    ['ceci', 'Ceci in scatola', 120, 7, 18, 2.5],
+    ['fagioli', 'Fagioli in scatola', 110, 7.5, 16, 0.5],
+    ['lenticchie', 'Lenticchie in scatola', 90, 7, 13, 0.4],
+    ['piselli', 'Piselli in scatola', 70, 5, 9, 0.5],
+    ['mozzarella', 'Mozzarella', 253, 18.7, 0.7, 19.5],
+    ['grana', 'Grana', 392, 33, 0, 28],
+    ['parmigiano', 'Parmigiano', 392, 33, 0, 28],
+    ['passata', 'Passata di pomodoro', 30, 1.5, 5.5, 0.2],
+    ['pomodori da insalata', 'Pomodori', 18, 0.9, 3.9, 0.2],
+    ['pomodor', 'Pomodori', 18, 0.9, 3.9, 0.2],
+    ['lattuga', 'Lattuga', 15, 1.4, 2.9, 0.2],
+    ['insalata', 'Insalata', 15, 1.4, 2.9, 0.2],
+    ['finocchi', 'Finocchi', 31, 1.2, 7.3, 0.2],
+    ['broccoli', 'Broccoli', 34, 2.8, 7, 0.4],
+    ['cavoli di bruxelles', 'Cavoletti di Bruxelles', 43, 3.4, 9, 0.3],
+    ['cavol', 'Cavolo', 25, 1.3, 6, 0.1],
+    ['spinaci', 'Spinaci', 23, 2.9, 3.6, 0.4],
+    ['carote', 'Carote', 41, 0.9, 10, 0.2],
+    ['zucchine', 'Zucchine', 17, 1.2, 3.1, 0.3],
+    ['melanzane', 'Melanzane', 25, 1, 6, 0.2],
+    ['peperoni', 'Peperoni', 26, 1, 6, 0.3],
+    ['porri', 'Porri', 61, 1.5, 14, 0.3],
+    ['verdure', 'Verdure miste', 40, 2, 6, 1],
+    ['banana', 'Banana', 89, 1.1, 23, 0.3, 120, 'frutto', 'frutti'],
+    ['mela', 'Mela', 52, 0.3, 14, 0.2, 200, 'frutto', 'frutti'],
+    ['pera', 'Pera', 57, 0.4, 15, 0.1, 170, 'frutto', 'frutti'],
+    ['arancia', 'Arancia', 47, 0.9, 12, 0.1, 200, 'frutto', 'frutti'],
+    ['kiwi', 'Kiwi', 61, 1.1, 15, 0.5, 75, 'frutto', 'frutti'],
+    ['cachi', 'Cachi', 70, 0.6, 18.6, 0.2, 250, 'frutto', 'frutti'],
+    ['prugne', 'Prugne', 46, 0.7, 11.4, 0.3, 40, 'frutto', 'frutti'],
+    ['fragole', 'Fragole', 32, 0.7, 7.7, 0.3],
+    ['mirtilli', 'Mirtilli', 57, 0.7, 14, 0.3],
+    ['lamponi', 'Lamponi', 52, 1.2, 12, 0.7],
+    ['uva', 'Uva', 69, 0.7, 18, 0.2],
+    ['melone', 'Melone', 34, 0.8, 8, 0.2],
+  ].map(r=>({key:r[0], label:r[1], kcal:r[2], prot:r[3], carb:r[4], fat:r[5], piece:r[6]||null, sing:r[7]||null, plur:r[8]||null}))
+   .sort((a,b)=>b.key.length - a.key.length);
+
+  function normFood(s){
+    return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function findFood(name){
+    const n = ' ' + normFood(name) + ' ';
+    return FOOD_DB.find(f => n.includes(' ' + f.key) ) || null;
+  }
+
+  // Trasforma il testo della dieta (giorni / pasti / alimento + quantità su righe separate)
+  // in uno o più piani, uno per persona se il documento ne contiene più di uno.
+  function parseDietText(text){
+    const DAY = /^(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)$/i;
+    const MEAL = /^(colazione|pranzo|cena|merenda|spuntino\s*\d*)\s*:?$/i;
+    const QTY = /^\[?\s*(\d+(?:[.,]\d+)?|½|¼|¾|\uFFFD)\s*(gr|g|grammi|ml)?\s*(?:\(\s*(\d+(?:[.,]\d+)?)\s*(?:gr|g)\s*\))?\s*\]?$/i;
+    const dayKey = w => { w = normFood(w); return w.startsWith('luned')?'lun':w.startsWith('marted')?'mar':w.startsWith('mercoled')?'mer':w.startsWith('gioved')?'gio':w.startsWith('venerd')?'ven':w.startsWith('sabato')?'sab':'dom'; };
+    const mealLabel = w => { w = normFood(w); if(w==='colazione') return 'Colazione'; if(w==='pranzo') return 'Pranzo'; if(w==='cena') return 'Cena'; if(w==='merenda') return 'Spuntino'; const n = w.replace('spuntino','').trim(); return n ? 'Spuntino '+n : 'Spuntino'; };
+    const num = s => s==='½'||s==='\uFFFD' ? 0.5 : s==='¼' ? 0.25 : s==='¾' ? 0.75 : parseFloat(String(s).replace(',','.'));
+
+    const lines = text.split('\n').map(l=>l.replace(/\s+/g,' ').trim()).filter(Boolean);
+    const people = [];
+    let person = null, day = null, meal = null, pendingName = null;
+
+    function newPerson(){
+      const nm = pendingName && /^[A-Za-zÀ-ú' ]{2,30}$/.test(pendingName) ? pendingName : 'Dieta ' + (people.length+1);
+      person = { name: nm.charAt(0).toUpperCase() + nm.slice(1).toLowerCase(), rawPlan:{}, unknown:new Set() };
+      people.push(person);
+    }
+    function addItem(rawName, qtyStr, unitStr, gramsInParen){
+      if(!day || !meal) return;
+      // olio indicato dentro il nome, es. "PATATE (OLIO: 10gr)"
+      const oil = rawName.match(/[\(\[]\s*olio\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:gr|g)?\s*[\)\]]/i);
+      let name = rawName.replace(/[\(\[][^\)\]]*[\)\]]/g,'').replace(/[\[\]:]/g,'').trim();
+      const food = findFood(name);
+      const n = num(qtyStr);
+      let grams, unit;
+      if(gramsInParen){ grams = num(gramsInParen); unit = food && food.sing ? (n===1?'1 '+food.sing:`${n} ${food.plur}`) : 'g'; }
+      else if(unitStr){ grams = n; unit = 'g'; }
+      else if(food && food.piece){ grams = Math.round(n * food.piece); unit = `${n===0.5?'1/2':n} ${n<=1?food.sing:food.plur}`; }
+      else { grams = n; unit = 'g'; }
+      const displayName = food ? food.label : name.charAt(0) + name.slice(1).toLowerCase();
+      if(!food) person.unknown.add(displayName);
+      const f = g => Math.round((food ? food[g] : 0) * grams) / 100;
+      const blocks = person.rawPlan[day];
+      const blk = blocks.find(b=>b[0]===meal) || (blocks.push([meal, []]), blocks[blocks.length-1]);
+      blk[1].push({ name: displayName, qty: Math.round(grams), unit, kcal: f('kcal'), prot: f('prot'), carb: f('carb'), fat: f('fat') });
+      if(oil){
+        const og = num(oil[1]); const o = findFood('olio');
+        blk[1].push({ name: o.label, qty: og, unit:'g', kcal: o.kcal*og/100, prot:0, carb:0, fat: o.fat*og/100 });
+      }
+    }
+
+    lines.forEach(line=>{
+      if(DAY.test(line)){
+        const k = dayKey(line);
+        if(!person || person.rawPlan[k]) newPerson(); // stesso giorno di nuovo = nuova persona
+        day = k; person.rawPlan[day] = []; meal = null; pendingName = null;
+        return;
+      }
+      if(MEAL.test(line)){ meal = mealLabel(line.replace(/:$/,'')); pendingName = null; return; }
+      const q = line.match(QTY);
+      if(q && pendingName){ addItem(pendingName, q[1], q[2], q[3]); pendingName = null; return; }
+      if(q) return;
+      if(/:\s*$/.test(line)){ pendingName = null; return; } // es. "PANCAKE:" = titolo di una ricetta
+      if(/^last update|^nota\b/i.test(line)) return;
+      // nome + quantità sulla stessa riga, es. "MELA 1 (200 gr)" o "[FARINA 50gr]"
+      const inline = line.replace(/^\[|\]$/g,'').match(/^(.*?[a-zà-ú)\]])\s+(\d+(?:[.,]\d+)?|½|\uFFFD)\s*(gr|g|ml)?\s*(?:\(\s*(\d+(?:[.,]\d+)?)\s*(?:gr|g)\s*\))?$/i);
+      if(inline && day && meal){ addItem(inline[1], inline[2], inline[3], inline[4]); pendingName = null; return; }
+      pendingName = line.replace(/^\[/,'');
+    });
+    people.forEach(p=>{ p.unknown = Array.from(p.unknown); Object.keys(p.rawPlan).forEach(k=>{ if(!p.rawPlan[k].length) delete p.rawPlan[k]; }); });
+    return people.filter(p=>Object.keys(p.rawPlan).length);
+  }
+
   let pendingImportPlan = null;
+  let importPeople = [];
 
   $('#btnImportPlan').addEventListener('click', ()=>{
     $('#planFileInput').value = '';
@@ -1076,35 +1481,82 @@
     $('#importPreview').innerHTML = '';
     $('#importConfirmBtn').style.display = 'none';
     pendingImportPlan = null;
+    const oldRow = document.getElementById('importPeopleRow'); if(oldRow) oldRow.remove();
     openModal('modalImportPlan');
   });
+
+  const IMPORT_DAY_NAMES = {lun:'Lun',mar:'Mar',mer:'Mer',gio:'Gio',ven:'Ven',sab:'Sab',dom:'Dom'};
+  function showImportPreview(rawPlan, unknown){
+    const dayKeys = Object.keys(rawPlan);
+    const stats = {};
+    dayKeys.forEach(k=>{ stats[k] = { meals: rawPlan[k].length, items: rawPlan[k].reduce((a,b)=>a+b[1].length,0) }; });
+    let html = `<div class="off-result">` + dayKeys.map(k=>
+      `<div style="display:flex;justify-content:space-between;font-size:14.5px;padding:4px 0;">
+        <span>${IMPORT_DAY_NAMES[k]}</span><span style="color:var(--ink-dim);font-family:var(--mono);">${stats[k].meals} pasti · ${stats[k].items} alimenti</span>
+      </div>`).join('') + `</div>`;
+    const preview = computeWeeklyAverageTargets(rawPlan);
+    if(preview){
+      html += `<div class="off-result" style="margin-top:10px;font-size:14.5px;"><b>Media giornaliera calcolata</b><br>${preview.kcal} kcal · Proteine ${preview.prot} g · Carboidrati ${preview.carb} g · Grassi ${preview.fat} g</div>`;
+    }
+    if(unknown && unknown.length){
+      html += `<div class="off-result" style="margin-top:10px;font-size:13.5px;color:var(--amber);">Non ho trovato i valori di: ${unknown.map(escapeHtml).join(', ')}. Li conto come 0: puoi correggere gli obiettivi a mano toccando i totali.</div>`;
+    }
+    $('#importStatus').textContent = `Trovati ${dayKeys.length} giorni:`;
+    $('#importPreview').innerHTML = html;
+    pendingImportPlan = rawPlan;
+    $('#importConfirmBtn').style.display = 'block';
+  }
+  function choosePerson(idx){
+    const p = importPeople[idx];
+    $$('#importPeopleRow .btn').forEach((b,i)=>b.classList.toggle('primary', i===idx));
+    showImportPreview(p.rawPlan, p.unknown);
+  }
 
   $('#planFileInput').addEventListener('change', async (e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    $('#importStatus').textContent = 'Leggo il PDF...';
+    const ext = (file.name.split('.').pop()||'').toLowerCase();
+    $('#importStatus').textContent = 'Leggo il file...';
     $('#importPreview').innerHTML = '';
     $('#importConfirmBtn').style.display = 'none';
+    pendingImportPlan = null;
+    importPeople = [];
     try{
+      if(ext === 'doc' || ext === 'docx'){
+        const buf = await file.arrayBuffer();
+        const text = ext === 'doc' ? docToText(buf) : await docxToText(buf);
+        importPeople = parseDietText(text);
+        if(importPeople.length === 0){
+          $('#importStatus').textContent = 'Non sono riuscito a riconoscere giorni e pasti nel documento. Puoi comunque aggiungere gli alimenti a mano.';
+          return;
+        }
+        if(importPeople.length === 1){ showImportPreview(importPeople[0].rawPlan, importPeople[0].unknown); return; }
+        // più diete nello stesso file: scegli quella giusta (preseleziona quella del proprietario dell'app se c'è)
+        let def = importPeople.findIndex(p=>new RegExp(APP.ownerMatch,'i').test(p.name)); if(def < 0) def = 0;
+        $('#importStatus').textContent = '';
+        $('#importPreview').innerHTML = '';
+        const row = document.createElement('div');
+        row.id = 'importPeopleRow';
+        row.className = 'btnrow';
+        row.style.margin = '6px 0 10px';
+        row.innerHTML = `<div style="width:100%;font-size:14.5px;margin-bottom:6px;">Nel file ci sono ${importPeople.length} diete. Quale vuoi usare?</div>` +
+          importPeople.map((p,i)=>`<button class="btn" data-person="${i}" style="flex:1;">${escapeHtml(p.name)}</button>`).join('');
+        $('#importStatus').after(row);
+        $$('#importPeopleRow .btn').forEach(b=>b.addEventListener('click', ()=>choosePerson(parseInt(b.dataset.person,10))));
+        choosePerson(def);
+        return;
+      }
+      if(!window.pdfjsLib){ $('#importStatus').textContent = 'Lettore PDF non disponibile.'; return; }
       const lines = await extractPdfLines(file);
-      const { rawPlan, stats } = parsePlanLines(lines);
-      const dayKeys = Object.keys(rawPlan);
-      if(dayKeys.length === 0){
+      const { rawPlan } = parsePlanLines(lines);
+      if(Object.keys(rawPlan).length === 0){
         $('#importStatus').textContent = 'Non sono riuscito a riconoscere la struttura del PDF. Puoi comunque aggiungere alimenti manualmente o con lo scanner.';
         return;
       }
-      const dayNames = {lun:'Lun',mar:'Mar',mer:'Mer',gio:'Gio',ven:'Ven',sab:'Sab',dom:'Dom'};
-      $('#importStatus').textContent = `Trovati ${dayKeys.length} giorni nel PDF:`;
-      $('#importPreview').innerHTML = `<div class="off-result">` + dayKeys.map(k=>
-        `<div style="display:flex;justify-content:space-between;font-size:14.5px;padding:4px 0;">
-          <span>${dayNames[k]}</span><span style="color:var(--ink-dim);font-family:var(--mono);">${stats[k].meals} pasti · ${stats[k].items} alimenti</span>
-        </div>`
-      ).join('') + `</div>`;
-      pendingImportPlan = rawPlan;
-      $('#importConfirmBtn').style.display = 'block';
+      showImportPreview(rawPlan, []);
     }catch(err){
       console.error(err);
-      $('#importStatus').textContent = 'Errore durante la lettura del PDF. Riprova o aggiungi il piano manualmente.';
+      $('#importStatus').textContent = 'Errore durante la lettura del file. Riprova o aggiungi il piano manualmente.';
     }
   });
 
@@ -1137,13 +1589,15 @@
     await storeSet('plan:custom', pendingImportPlan);
     activePlan = buildTemplateFrom(pendingImportPlan);
     closeModal('modalImportPlan');
-    toast('Nuovo piano caricato');
-    updatePlanSourceNote();
     const newTargets = computeWeeklyAverageTargets(pendingImportPlan);
     if(newTargets){
       targets = newTargets;
       await storeSet('targets', targets);
+      toast(`Dieta caricata: ${targets.kcal} kcal · P ${targets.prot}g · C ${targets.carb}g · G ${targets.fat}g al giorno`);
+    } else {
+      toast('Dieta caricata');
     }
+    updatePlanSourceNote();
     await addPlanIngredientsToShopping(activePlan, true);
     await loadDay();
   });
@@ -1151,22 +1605,26 @@
   $('#planRestoreBtn').addEventListener('click', async ()=>{
     await storeSet('plan:custom', null);
     activePlan = PLAN_TEMPLATE;
+    targets = Object.assign({}, DEFAULT_TARGETS);
+    await storeSet('targets', targets);
     closeModal('modalImportPlan');
-    toast('Ripristinato il piano di esempio');
+    toast(APP.hasStarterPlan ? 'Tornata alla dieta iniziale' : 'Dieta rimossa');
+    renderTotals();
     updatePlanSourceNote();
     await loadDay();
   });
 
   function updatePlanSourceNote(){
     const isCustom = activePlan !== PLAN_TEMPLATE;
-    $('#planSourceNote').textContent = isCustom ? 'Piano personalizzato caricato da PDF.' : 'Piano di esempio (dalla dieta caricata inizialmente).';
+    $('#planSourceNote').textContent = isCustom ? `Dieta caricata dal file · obiettivi: ${targets.kcal} kcal · P ${targets.prot}g · C ${targets.carb}g · G ${targets.fat}g al giorno` : (APP.hasStarterPlan ? `Dieta iniziale · obiettivi: ${targets.kcal} kcal · P ${targets.prot}g · C ${targets.carb}g · G ${targets.fat}g al giorno` : 'Nessuna dieta caricata.');
     $('#planRestoreBtn').style.display = isCustom ? 'block' : 'none';
   }
 
   let currentDate = new Date();
   let calViewMonth = new Date();
   let currentTab = 'diario';
-  let targets = { kcal:1702, prot:100, carb:232, fat:45 }; // media settimanale della nuova dieta Ester
+  const DEFAULT_TARGETS = /*TARGETS*/{ kcal:1702, prot:100, carb:232, fat:45 }/*END_TARGETS*/; // obiettivi della dieta precaricata
+  let targets = Object.assign({}, DEFAULT_TARGETS);
   let foodEntries = [];
   let checkedMap = {};
   let planQtyOverride = {}; // { itemId: nuoviGrammi } per il giorno corrente
@@ -1286,7 +1744,133 @@
 
   let libraryFilter = 'Tutti';
 
-  const QUICK_FOODS = [
+
+  /* ---------- esercizi aggiuntivi (senza figura: si vede la mappa dei muscoli) ---------- */
+  EXERCISE_LIBRARY.push(
+    { id:'hipthrust', name:'Hip thrust', category:'Pesi', muscle:'Glutei e femorali',
+      setup:'Schiena (sotto le scapole) appoggiata su una panca, piedi a terra larghezza bacino, bilanciere imbottito sulle anche.',
+      execution:'Spingi coi talloni e solleva il bacino finché busto e cosce sono in linea, stringi i glutei 1 secondo in alto, poi scendi controllando.',
+      tips:['In alto le tibie sono verticali','Mento leggermente verso il petto, sguardo in avanti','La spinta parte dai talloni'],
+      errors:['Inarcare la zona lombare in alto invece di estendere le anche','Piedi troppo lontani (lavorano solo i femorali)']
+    },
+    { id:'stacco_rumeno', name:'Stacco rumeno', category:'Pesi', muscle:'Femorali, glutei, lombari',
+      setup:'In piedi col bilanciere in mano davanti alle cosce, piedi larghezza bacino, ginocchia leggermente piegate.',
+      execution:'Spingi il bacino indietro facendo scendere il bilanciere lungo le gambe fino a sentire tirare i femorali (circa metà tibia), poi risali spingendo le anche in avanti.',
+      tips:['Le ginocchia restano quasi ferme, si muovono le anche','Il bilanciere sfiora le gambe per tutta la discesa','Scendi solo finché la schiena resta dritta'],
+      errors:['Schiena che si arrotonda per scendere più in basso','Trasformarlo in uno squat piegando troppo le ginocchia']
+    },
+    { id:'legpress', name:'Leg press', category:'Pesi', muscle:'Quadricipiti e glutei',
+      setup:'Schiena e bacino ben appoggiati allo schienale, piedi sulla pedana larghezza spalle.',
+      execution:'Sblocca la pedana, piega le ginocchia verso il petto in modo controllato, poi spingi fino a gambe quasi distese.',
+      tips:['Le ginocchia seguono la direzione delle punte dei piedi','Non bloccare del tutto le ginocchia in alto'],
+      errors:['Bacino che si stacca dallo schienale in basso (stress sulla zona lombare)','Ginocchia che cedono verso l\'interno']
+    },
+    { id:'latmachine', name:'Lat machine', category:'Pesi', muscle:'Dorsali e bicipiti',
+      setup:'Seduto con le cosce bloccate sotto i rulli, presa sulla barra poco più larga delle spalle.',
+      execution:'Porta il petto leggermente in fuori e tira la barra verso la parte alta del petto portando i gomiti verso i fianchi, poi risali lentamente.',
+      tips:['Pensa a portare giù i gomiti, non a tirare con le mani','Spalle lontane dalle orecchie'],
+      errors:['Tirare dietro la nuca','Dondolare all\'indietro con il busto per usare lo slancio']
+    },
+    { id:'panca_inclinata', name:'Panca inclinata', category:'Pesi', muscle:'Petto alto, spalle, tricipiti',
+      setup:'Panca a 30-45°, scapole strette e appoggiate, piedi ben piantati a terra.',
+      execution:'Scendi col peso verso la parte alta del petto con i gomiti a circa 45° dal busto, poi spingi in alto.',
+      tips:['Scapole retratte per tutta la serie','Polsi dritti sopra i gomiti'],
+      errors:['Gomiti aperti a 90° (stress sulle spalle)','Staccare i glutei dalla panca']
+    },
+    { id:'alzate_laterali', name:'Alzate laterali', category:'Pesi', muscle:'Spalle',
+      setup:'In piedi, manubri lungo i fianchi, gomiti leggermente piegati, busto un po\' inclinato in avanti.',
+      execution:'Solleva i manubri lateralmente fino all\'altezza delle spalle, poi scendi lentamente.',
+      tips:['Guida il movimento con i gomiti','Peso leggero e controllo: è un esercizio di isolamento'],
+      errors:['Alzare le spalle verso le orecchie (lavora il trapezio)','Usare lo slancio del busto']
+    },
+    { id:'dip', name:'Dip alle parallele', category:'Corpo libero', muscle:'Tricipiti, petto, spalle',
+      setup:'In sospensione sulle parallele, braccia distese, spalle basse.',
+      execution:'Piega i gomiti scendendo finché le spalle arrivano circa all\'altezza dei gomiti, poi spingi per tornare su.',
+      tips:['Busto dritto = più tricipiti, busto inclinato = più petto','Scendi solo fin dove le spalle stanno comode'],
+      errors:['Scendere troppo in basso con le spalle che vanno in avanti','Spalle che salgono verso le orecchie']
+    },
+    { id:'calf', name:'Calf raise', category:'Pesi', muscle:'Polpacci',
+      setup:'Avampiedi su un rialzo, talloni liberi, gambe distese.',
+      execution:'Sali sulle punte il più in alto possibile, fermati 1 secondo, poi scendi lentamente sotto il livello del rialzo.',
+      tips:['Movimento completo, lento in discesa'],
+      errors:['Rimbalzare in basso','Piegare le ginocchia per aiutarsi']
+    },
+  );
+
+  // nomi alternativi: scrivendo "stacco" trovo "Stacco da terra", ecc.
+  const EX_ALIASES = {
+    squat:['squat','accosciata','back squat'], affondi:['affondi','affondo','lunge','lunges','bulgaro','bulgarian'],
+    stacco:['stacco','stacco da terra','deadlift','stacchi','stacco sumo'], panca:['panca','panca piana','bench','bench press','distensioni'],
+    military:['military','lento avanti','overhead press','shoulder press','lento'], trazioni:['trazioni','pull up','pullup','chin up'],
+    rematore:['rematore','row','pulley','rematore manubrio'], curl:['curl','bicipiti'], pushup:['piegamenti','flessioni','push up','pushup'],
+    plank:['plank'], burpee:['burpee','burpees'], jumpingjack:['jumping jack','jumping jacks'], mountainclimber:['mountain climber','mountain climbers'],
+    plancklaterale:['plank laterale','side plank'], hipthrust:['hip thrust','ponte glutei','glute bridge'],
+    stacco_rumeno:['stacco rumeno','rdl','romanian deadlift','stacco gambe tese'], legpress:['leg press','pressa'],
+    latmachine:['lat machine','lat pulldown','lat'], panca_inclinata:['panca inclinata','inclinata','incline bench'],
+    alzate_laterali:['alzate laterali','alzate','lateral raise'], dip:['dip','dips','parallele'], calf:['calf','calf raise','polpacci'],
+  };
+  // muscoli principali (p) e secondari (s) per la mappa
+  const EX_MUSCLES = {
+    squat:{p:['quadricipiti','glutei'], s:['femorali','lombari','addome','polpacci']},
+    affondi:{p:['quadricipiti','glutei'], s:['femorali','polpacci']},
+    stacco:{p:['femorali','glutei','lombari'], s:['dorsali','trapezi','quadricipiti','avambracci']},
+    panca:{p:['petto'], s:['spalle','tricipiti']},
+    military:{p:['spalle'], s:['tricipiti','trapezi','addome']},
+    trazioni:{p:['dorsali'], s:['bicipiti','avambracci','trapezi']},
+    rematore:{p:['dorsali','trapezi'], s:['bicipiti','lombari','spalle']},
+    curl:{p:['bicipiti'], s:['avambracci']},
+    pushup:{p:['petto'], s:['spalle','tricipiti','addome']},
+    plank:{p:['addome'], s:['obliqui','spalle','lombari']},
+    burpee:{p:['quadricipiti','petto'], s:['spalle','glutei','addome','polpacci']},
+    jumpingjack:{p:['polpacci','spalle'], s:['quadricipiti','glutei']},
+    mountainclimber:{p:['addome'], s:['spalle','quadricipiti','obliqui']},
+    plancklaterale:{p:['obliqui'], s:['addome','spalle','glutei']},
+    hipthrust:{p:['glutei'], s:['femorali','lombari','quadricipiti']},
+    stacco_rumeno:{p:['femorali','glutei'], s:['lombari','dorsali','avambracci']},
+    legpress:{p:['quadricipiti','glutei'], s:['femorali','polpacci']},
+    latmachine:{p:['dorsali'], s:['bicipiti','avambracci','trapezi']},
+    panca_inclinata:{p:['petto','spalle'], s:['tricipiti']},
+    alzate_laterali:{p:['spalle'], s:['trapezi']},
+    dip:{p:['tricipiti','petto'], s:['spalle']},
+    calf:{p:['polpacci'], s:[]},
+  };
+
+  function muscleMapSvg(m){
+    const P = new Set(m.p), S = new Set(m.s);
+    const col = k => P.has(k) ? 'fill="var(--amber)" fill-opacity="0.95"' : S.has(k) ? 'fill="var(--amber)" fill-opacity="0.3"' : 'fill="currentColor" fill-opacity="0.12"';
+    const e = (k, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" ${col(k)}/>`;
+    const r = (k, x, y, w, h, rr) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rr}" ${col(k)}/>`;
+    const body = cx => `<circle cx="${cx}" cy="16" r="10" fill="currentColor" fill-opacity="0.12"/>
+      <path d="M${cx-24} 36 Q${cx} 28 ${cx+24} 36 L${cx+20} 98 L${cx-20} 98 Z" fill="currentColor" fill-opacity="0.06"/>`;
+    const front = 60, back = 170;
+    return `<svg viewBox="0 0 230 196" style="width:100%;max-width:340px;display:block;margin:6px auto 0;color:var(--ink-dim)">
+      ${body(front)}${body(back)}
+      ${e('spalle',front-24,42,8,7)}${e('spalle',front+24,42,8,7)}
+      ${e('petto',front-10,52,11,8)}${e('petto',front+10,52,11,8)}
+      ${e('bicipiti',front-30,64,5,11)}${e('bicipiti',front+30,64,5,11)}
+      ${e('avambracci',front-34,88,4,12)}${e('avambracci',front+34,88,4,12)}
+      ${r('addome',front-8,62,16,32,6)}
+      ${e('obliqui',front-15,78,4,11)}${e('obliqui',front+15,78,4,11)}
+      ${e('quadricipiti',front-9,124,8,21)}${e('quadricipiti',front+9,124,8,21)}
+      ${e('polpacci',front-9,166,5,13)}${e('polpacci',front+9,166,5,13)}
+      ${e('trapezi',back,36,15,7)}
+      ${e('spalle',back-24,42,8,7)}${e('spalle',back+24,42,8,7)}
+      ${e('dorsali',back-11,62,10,15)}${e('dorsali',back+11,62,10,15)}
+      ${e('tricipiti',back-30,64,5,11)}${e('tricipiti',back+30,64,5,11)}
+      ${e('avambracci',back-34,88,4,12)}${e('avambracci',back+34,88,4,12)}
+      ${r('lombari',back-7,78,14,16,5)}
+      ${e('glutei',back-9,104,9,9)}${e('glutei',back+9,104,9,9)}
+      ${e('femorali',back-9,130,8,18)}${e('femorali',back+9,130,8,18)}
+      ${e('polpacci',back-9,168,6,13)}${e('polpacci',back+9,168,6,13)}
+      <text x="${front}" y="194" text-anchor="middle" font-size="10" fill="currentColor">Davanti</text>
+      <text x="${back}" y="194" text-anchor="middle" font-size="10" fill="currentColor">Dietro</text>
+    </svg>`;
+  }
+
+  function cleanExName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim(); }
+  function exAliases(ex){ return [ex.name].concat(EX_ALIASES[ex.id]||[]).map(cleanExName); }
+
+  let QUICK_FOODS_BASE = [
     {name:'Uovo', kcal:155, prot:13, carb:1.1, fat:11},
     {name:'Petto di pollo', kcal:165, prot:31, carb:0, fat:3.6},
     {name:'Riso bianco cotto', kcal:130, prot:2.7, carb:28, fat:0.3},
@@ -1312,8 +1896,31 @@
       container.appendChild(chip);
     });
   }
+  let QUICK_FOODS = QUICK_FOODS_BASE.slice();
+  // alimenti della dieta caricata (valori per 100 g ricavati dal piano) + porzione tipica
+  function rebuildQuickFoods(){
+    const seen = new Map();
+    Object.values(activePlan||{}).forEach(blocks=>(blocks||[]).forEach(block=>(block.items||[]).forEach(it=>{
+      if(!it.qty || it.qty<=0 || !(it.kcal>0)) return;
+      const k = it.name.toLowerCase();
+      if(seen.has(k)) return;
+      const f = 100/it.qty;
+      seen.set(k, { name: it.name, kcal: it.kcal*f, prot:(it.prot||0)*f, carb:(it.carb||0)*f, fat:(it.fat||0)*f, portion: Math.round(it.qty), fromDiet:true });
+    })));
+    const dietFoods = Array.from(seen.values()).sort((a,b)=>a.name.localeCompare(b.name,'it'));
+    const dietNames = new Set(dietFoods.map(f=>f.name.toLowerCase()));
+    QUICK_FOODS = dietFoods.concat(QUICK_FOODS_BASE.filter(f=>!dietNames.has(f.name.toLowerCase())));
+    if(quickFoodSel && !QUICK_FOODS.some(f=>f.name===quickFoodSel)) quickFoodSel = null;
+  }
   function initStaticChips(){
-    buildChips($('#quickFoodChips'), QUICK_FOODS, ()=>quickFoodSel, v=>quickFoodSel=v);
+    rebuildQuickFoods();
+    buildChips($('#quickFoodChips'), QUICK_FOODS, ()=>quickFoodSel, v=>{
+      quickFoodSel = v;
+      const f = QUICK_FOODS.find(x=>x.name===v);
+      if(f && f.portion) $('#quickQty').value = f.portion;
+    });
+    const nDiet = QUICK_FOODS.filter(f=>f.fromDiet).length;
+    $('#quickDietNote').textContent = nDiet ? `I primi ${nDiet} sono gli alimenti della tua dieta (con la porzione prevista).` : '';
   }
 
   function switchToTab(tab){
@@ -1437,11 +2044,12 @@
       {lbl:'Grassi', val:s.fat, goal:targets.fat, unit:'g'},
     ];
     $('#totalsRow').innerHTML = rows.map(r=>{
-      const pct = Math.min(100, Math.round((r.val/r.goal)*100)||0);
-      const over = r.val > r.goal;
+      const hasGoal = r.goal > 0;
+      const pct = hasGoal ? Math.min(100, Math.round((r.val/r.goal)*100)||0) : 0;
+      const over = hasGoal && r.val > r.goal;
       return `<div class="stat">
         <div class="val ${over?'over':''}">${Math.round(r.val)}${r.unit}</div>
-        <div class="lbl">${r.lbl}</div>
+        <div class="lbl">${r.lbl}${hasGoal ? ' / '+Math.round(r.goal)+r.unit : ''}</div>
         <div class="bar"><div class="${over?'over':''}" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
@@ -1449,12 +2057,19 @@
 
   function renderPlan(){
     const wrap = $('#planCard');
-    const blocks = planItemsForDay();
+    let blocks = planItemsForDay();
+    const noPlanLoaded = Object.keys(activePlan).length===0;
+    if(blocks.length===0){
+      blocks = ['Colazione','Spuntino 1','Pranzo','Spuntino 2','Cena'].map(label=>({label, items:[]}));
+    }
     const matchedMealLabels = new Set(blocks.map(b=>b.label));
     let html = `<h3>Piano di oggi <span class="eyebrow" style="margin:0;">spunta se l'hai mangiato</span></h3>`;
-    if(blocks.length===0){
-      html += `<div class="empty">Nessun piano per questo giorno</div>`;
-    } else {
+    if(noPlanLoaded){
+      html += `<div class="empty" style="margin-bottom:12px;">Nessuna dieta caricata. Carica il file del nutrizionista (PDF o Word) con il pulsante qui sopra: calcolo io calorie, proteine, carboidrati e grassi giornalieri. Intanto puoi aggiungere gli alimenti con ＋.</div>`;
+    } else if(planItemsForDay().length===0){
+      html += `<div class="empty" style="margin-bottom:12px;">Nessun piano per questo giorno</div>`;
+    }
+    {
       blocks.forEach((block, bi)=>{
         const checkedKcal = block.items.reduce((a,it)=>a + (checkedMap[it.id] ? effectiveItemMacros(it).kcal : 0), 0);
         const extraForBlock = foodEntries.filter(e=>e.meal===block.label);
@@ -1472,7 +2087,7 @@
           const on = !!checkedMap[it.id];
           const eff = effectiveItemMacros(it);
           const edited = planQtyOverride[it.id] != null;
-          const qtyStr = eff.qty ? `${eff.qty}${it.unit==='g'?'g':' '+it.unit}` : (it.unit||'');
+          const qtyStr = eff.qty ? (it.unit && it.unit!=='g' && /^[\d/]/.test(it.unit) && !edited ? `${it.unit} (${Math.round(eff.qty)}g)` : `${Math.round(eff.qty)}${it.unit==='g'?'g':' '+(it.unit||'')}`) : (it.unit||'');
           const canEdit = it.qty && it.qty > 0;
           html += `<div class="plan-row ${on?'checked':''}" data-id="${it.id}">
             <div class="checkbox ${on?'on':''}">${on?'✓':''}</div>
@@ -1631,9 +2246,9 @@
   $('#menuBtnManualAdd').addEventListener('click', ()=>{ closeModal('modalAddMenu'); openManualAddModal(); });
 
   function openQuickAddModal(){
-    if(!quickFoodSel) quickFoodSel = QUICK_FOODS[0].name;
     $('#quickMealLabel').textContent = pendingMealTarget;
     initStaticChips();
+    if(!quickFoodSel){ quickFoodSel = QUICK_FOODS[0].name; $('#quickQty').value = QUICK_FOODS[0].portion || 100; initStaticChips(); }
     openModal('modalQuick');
   }
   $('#quickSaveBtn').addEventListener('click', async ()=>{
@@ -1710,58 +2325,97 @@
     manualPrefill = null;
   });
 
+  /* ---------- scansione codice a barre ----------
+     Problemi risolti: su iPhone l'obiettivo "normale" non mette a fuoco da vicino e l'immagine
+     veniva ritagliata (effetto super zoomato). Ora:
+     - preferisco la fotocamera "virtuale" multi-obiettivo (tripla/doppia) che passa da sola alla
+       lente macro/grandangolare quando sei vicino; poi la normale; mai il teleobiettivo;
+     - non forzo più il formato 16:9 e il video si vede intero (niente ritaglio);
+     - messa a fuoco continua dove il telefono la supporta, zoom al minimo, tasto "Cambia obiettivo";
+     - l'obiettivo che funziona viene ricordato per la volta dopo. */
+  const SCAN_CAM_KEY = APP.prefix + 'scan_camera_label';
+  let scanCams = [], scanCamIdx = 0;
+  function rankBackCameras(cameras){
+    const back = c => /back|rear|posterior|environment|retro/i.test(c.label||'');
+    const score = c => {
+      const l = (c.label||'').toLowerCase();
+      if(/tele/.test(l)) return -10;                          // teleobiettivo: troppo zoomato
+      if(/triple|tripla/.test(l)) return 50;                  // multi-obiettivo con macro automatica
+      if(/dual wide|doppia grandangolare|grandangolare doppia/.test(l)) return 45;
+      if(/dual|doppia/.test(l)) return 40;
+      if(/ultra/.test(l)) return 20;                          // ultra-grandangolare: mette a fuoco vicino, ma meno nitida
+      return 30;                                              // obiettivo normale
+    };
+    let list = (cameras||[]).filter(back);
+    if(!list.length) list = (cameras||[]).slice();
+    list.sort((a,b)=>score(b)-score(a));
+    const saved = (()=>{ try{ return localStorage.getItem(SCAN_CAM_KEY); }catch(e){ return null; } })();
+    if(saved){ const i = list.findIndex(c=>c.label===saved); if(i>0) list.unshift(list.splice(i,1)[0]); }
+    return list;
+  }
+  async function startScanCamera(){
+    const cam = scanCams[scanCamIdx];
+    const config = { fps:10, qrbox:(w,h)=>({ width:Math.round(Math.min(w*0.85, 320)), height:Math.round(Math.min(h*0.45, 170)) }) };
+    const video = { width:{ ideal:1920 }, height:{ ideal:1080 } };
+    if(cam) video.deviceId = { exact: cam.id }; else video.facingMode = { ideal:'environment' };
+    config.videoConstraints = video;
+    await scannerCtrl.start(cam ? cam.id : { facingMode:'environment' }, config, onScanSuccess, ()=>{});
+    // messa a fuoco continua (Android) e zoom al minimo
+    try{
+      const caps = scannerCtrl.getRunningTrackCapabilities ? scannerCtrl.getRunningTrackCapabilities() : {};
+      const adv = {};
+      if(caps.focusMode && caps.focusMode.includes('continuous')) adv.focusMode = 'continuous';
+      if(caps.zoom) adv.zoom = caps.zoom.min ?? 1;
+      if(Object.keys(adv).length) await scannerCtrl.applyVideoConstraints({ advanced:[adv] }).catch(()=>{});
+    }catch(e){}
+    setupZoomControl();
+    const btn = $('#scanSwitchCam');
+    if(scanCams.length > 1){ btn.style.display = 'block'; btn.textContent = `🔄 Cambia obiettivo (${scanCamIdx+1}/${scanCams.length})`; }
+    else btn.style.display = 'none';
+  }
   async function openScanModal(){
     $('#offResultWrap').innerHTML = '';
     $('#scanStatus').textContent = 'Inquadra il codice a barre del prodotto';
     $('#zoomControlWrap').style.display = 'none';
+    $('#scanSwitchCam').style.display = 'none';
+    lastScanned = null; // così lo stesso prodotto si può scansionare di nuovo
     openModal('modalScan');
     try{
-      scannerCtrl = new Html5Qrcode('scanner-region');
-      const config = {
-        fps:10,
-        qrbox:{width:280,height:160},
-        aspectRatio: 1.777,
-        disableFlip:false,
+      scannerCtrl = new Html5Qrcode('scanner-region', {
+        verbose:false,
         formatsToSupport:[
           Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
           Html5QrcodeSupportedFormats.CODE_128
-        ]
-      };
-      // Scelgo esplicitamente la lente "normale" posteriore, evitando ultra-grandangolare/macro/tele
-      // (su iPhone con più obiettivi, quella sbagliata causa l'effetto troppo zoomato/sfocato da vicino)
-      const cameras = await Html5Qrcode.getCameras();
-      let camId = null;
-      if(cameras && cameras.length){
-        const normal = cameras.find(c => /back camera$/i.test(c.label.trim()) || /^back camera/i.test(c.label) );
-        const anyBack = cameras.find(c => /back|rear|environment/i.test(c.label) && !/ultra|wide angle|tele|macro/i.test(c.label));
-        const fallbackBack = cameras.find(c => /back|rear|environment/i.test(c.label));
-        camId = (normal || anyBack || fallbackBack || cameras[cameras.length-1] || cameras[0]).id;
-      }
-      if(camId){
-        await scannerCtrl.start(camId, config, onScanSuccess, ()=>{});
-      } else {
-        await scannerCtrl.start({ facingMode: { ideal:'environment' } }, config, onScanSuccess, ()=>{});
-      }
-      setupZoomControl();
+        ],
+        experimentalFeatures:{ useBarCodeDetectorIfSupported:true }   // lettore nativo del telefono, più veloce, dove c'è
+      });
+      let cameras = [];
+      try{ cameras = await Html5Qrcode.getCameras(); }catch(e){ cameras = []; }
+      scanCams = rankBackCameras(cameras); scanCamIdx = 0;
+      await startScanCamera();
     }catch(err){
       $('#scanStatus').textContent = 'Impossibile accedere alla fotocamera. Controlla i permessi.';
       console.error(err);
     }
   }
+  $('#scanSwitchCam').addEventListener('click', async ()=>{
+    if(!scannerCtrl || scanCams.length < 2) return;
+    try{ await scannerCtrl.stop(); }catch(e){}
+    scanCamIdx = (scanCamIdx + 1) % scanCams.length;
+    try{ await startScanCamera(); }catch(e){ $('#scanStatus').textContent = 'Questo obiettivo non si apre, prova il successivo.'; }
+  });
 
   function setupZoomControl(){
     try{
       const caps = scannerCtrl.getRunningTrackCapabilities ? scannerCtrl.getRunningTrackCapabilities() : null;
-      if(caps && caps.zoom){
+      if(caps && caps.zoom && caps.zoom.max > caps.zoom.min){
         const min = caps.zoom.min ?? 1;
-        const max = caps.zoom.max ?? 5;
-        const step = caps.zoom.step ?? 0.1;
+        const max = Math.min(caps.zoom.max ?? 5, min*4);
+        const step = caps.zoom.step || 0.1;
         const slider = $('#zoomSlider');
         slider.min = min; slider.max = max; slider.step = step; slider.value = min;
         $('#zoomControlWrap').style.display = 'block';
-        // forza subito lo zoom minimo possibile, per partire il più "largo" possibile
-        scannerCtrl.applyVideoConstraints({ advanced:[{ zoom: min }] }).catch(()=>{});
         slider.oninput = ()=>{
           scannerCtrl.applyVideoConstraints({ advanced:[{ zoom: Number(slider.value) }] }).catch(()=>{});
         };
@@ -1773,9 +2427,11 @@
     }
   }
 
+  function rememberScanCamera(){ try{ const c = scanCams[scanCamIdx]; if(c && c.label) localStorage.setItem(SCAN_CAM_KEY, c.label); }catch(e){} }
   async function stopScanner(){
     if(scannerCtrl){ try{ await scannerCtrl.stop(); scannerCtrl.clear(); }catch(e){} scannerCtrl = null; }
     $('#zoomControlWrap').style.display = 'none';
+    $('#scanSwitchCam').style.display = 'none';
   }
   document.querySelector('[data-close="modalScan"]').addEventListener('click', stopScanner);
   $('#modalScan').addEventListener('click', (e)=>{ if(e.target.id==='modalScan') stopScanner(); });
@@ -1858,6 +2514,7 @@
     if(decodedText === lastScanned) return;
     lastScanned = decodedText;
     $('#scanStatus').textContent = 'Codice trovato: ' + decodedText;
+    rememberScanCamera();
     await stopScanner();
     await lookupBarcodeAndRender(decodedText, $('#scanStatus'), $('#offResultWrap'), 'modalScan');
   }
@@ -1876,23 +2533,289 @@
 
   /* ---------- istruzioni inline nell'esercizio (dalla libreria) ---------- */
   function findLibraryExercise(name){
-    const n = normalizeExName(name);
-    return EXERCISE_LIBRARY.find(e => normalizeExName(e.name) === n);
+    const n = cleanExName(name);
+    if(n.length < 3) return null;
+    let best = null, bestScore = 0;
+    EXERCISE_LIBRARY.forEach(ex=>{
+      exAliases(ex).forEach(a=>{
+        let sc = 0;
+        if(a === n) sc = 1000 + a.length;
+        else if((' '+n+' ').includes(' '+a+' ')) sc = 300 + a.length;
+        else if(a.startsWith(n)) sc = 200 - a.length;
+        if(sc > bestScore){ bestScore = sc; best = ex; }
+      });
+    });
+    return best;
   }
+  // massimale per un esercizio, anche se scritto in modo diverso ("stacco" -> "Stacco da terra")
+  function findMaxFor(name){
+    const key = normalizeExName(name);
+    if(maxlifts[key]) return Object.assign({key}, maxlifts[key]);
+    const ex = findLibraryExercise(name);
+    if(!ex) return null;
+    for(const [k,m] of Object.entries(maxlifts)){
+      const mex = findLibraryExercise(m.label);
+      if(mex && mex.id === ex.id) return Object.assign({key:k}, m);
+    }
+    return null;
+  }
+  /* ---------- esercizi da wger.de (API pubblica, gratuita, senza chiave) ----------
+     Se l'esercizio non è nella libreria interna lo cerco su wger direttamente dal browser.
+     I risultati restano salvati sul telefono, così la seconda volta funziona anche offline. */
+  const WGER = 'https://wger.de';
+  const WGER_LANG = { it:13, en:2 };
+  // parole italiane comuni -> inglese, perché su wger molte traduzioni italiane mancano
+  const IT_EN = [
+    ['stacco rumeno','romanian deadlift'],['stacco','deadlift'],['panca inclinata','incline bench press'],['panca declinata','decline bench press'],['panca','bench press'],
+    ['spinte','press'],['distensioni','press'],['lento avanti','overhead press'],['rematore','row'],['pulley','seated cable row'],['trazioni','pull up'],
+    ['alzate laterali','lateral raise'],['alzate frontali','front raise'],['alzate','raise'],['croci','fly'],['curl martello','hammer curl'],
+    ['french press','skull crusher'],['estensioni','extension'],['tricipiti','triceps'],['bicipiti','biceps'],['polpacci','calf raise'],['affondi','lunge'],
+    ['affondo','lunge'],['pressa','leg press'],['accosciata','squat'],['ponte','glute bridge'],['addominali','crunch'],['crunch','crunch'],
+    ['manubri','dumbbell'],['manubrio','dumbbell'],['bilanciere','barbell'],['cavi','cable'],['cavo','cable'],['macchina','machine'],
+    ['piegamenti','push up'],['flessioni','push up'],['scrollate','shrug'],['iperestensioni','hyperextension'],['face pull','face pull'],
+    ['leg curl','leg curl'],['leg extension','leg extension'],['hip thrust','hip thrust'],['plank','plank'],['tirate al mento','upright row'],
+  ];
+  function itToEn(q){
+    let t = ' '+cleanExName(q)+' ';
+    IT_EN.forEach(([it,en])=>{ t = t.replace(' '+it+' ', ' '+en+' '); });
+    return t.trim();
+  }
+  function wgerCacheGet(k){ try{ return JSON.parse(localStorage.getItem(APP.prefix+'wger_'+k)); }catch(e){ return null; } }
+  function wgerCacheSet(k,v){ try{ localStorage.setItem(APP.prefix+'wger_'+k, JSON.stringify(v)); }catch(e){} }
+
+  // cerca su wger: /api/v2/exerciseinfo/?name__search=... restituisce già muscoli, immagini e descrizioni
+  async function wgerQuery(t){
+    const res = await fetch(`${WGER}/api/v2/exerciseinfo/?name__search=${encodeURIComponent(t)}&limit=20`, {headers:{Accept:'application/json'}, credentials:'omit', referrerPolicy:'no-referrer'});
+    if(!res.ok) throw new Error('wger '+res.status);
+    const data = await res.json();
+    return (Array.isArray(data.results) ? data.results : []).map(wgerToInfo).filter(Boolean);
+  }
+  async function wgerSearch(term){
+    const key = 's3_'+cleanExName(term);
+    const cached = wgerCacheGet(key); if(cached) return cached;
+    const q = cleanExName(term), qe = itToEn(term);
+    let list = await wgerQuery(q);
+    if(qe !== q){
+      const more = await wgerQuery(qe);
+      const ids = new Set(list.map(x=>x.id));
+      list = list.concat(more.filter(x=>!ids.has(x.id)));
+    }
+    // tengo solo i risultati che contengono tutte le parole cercate (in italiano o in inglese)
+    const hasAll = (name, query) => { const n = ' '+cleanExName(name)+' '; return query.split(' ').every(w=>n.includes(' '+w)); };
+    const relevant = list.filter(x=>hasAll(x.name, q) || hasAll(x.nameEn||'', qe) || hasAll(x.nameEn||'', q));
+    if(relevant.length) list = relevant;
+    // prima il nome identico, poi quelli con descrizione, poi i nomi più corti (di solito l'esercizio "base")
+    const score = x => (cleanExName(x.name)===q || cleanExName(x.nameEn||'')===qe ? 0 : 2) + (x.description ? 0 : 1);
+    list.sort((x,y)=> score(x) - score(y) || x.name.length - y.name.length);
+    const top = list.slice(0,6);
+    wgerCacheSet(key, top);
+    return top;
+  }
+
+  // muscoli wger -> zone della mappa
+  function wgerMuscleKey(m){
+    const n = ((m.name_en||'')+' '+(m.name||'')).toLowerCase();
+    if(/quad/.test(n)) return 'quadricipiti';
+    if(/glute/.test(n)) return 'glutei';
+    if(/hamstring|biceps femoris/.test(n)) return 'femorali';
+    if(/calf|calves|gastrocnemius|soleus/.test(n)) return 'polpacci';
+    if(/\blats?\b|latissimus/.test(n)) return 'dorsali';
+    if(/trapez/.test(n)) return 'trapezi';
+    if(/oblique|obliquus/.test(n)) return 'obliqui';
+    if(/abs|rectus abdominis/.test(n)) return 'addome';
+    if(/chest|pectoralis/.test(n)) return 'petto';
+    if(/shoulder|deltoid/.test(n)) return 'spalle';
+    if(/triceps/.test(n)) return 'tricipiti';
+    if(/biceps|brachialis/.test(n)) return 'bicipiti';
+    if(/lower back|erector/.test(n)) return 'lombari';
+    if(/forearm|brachioradialis/.test(n)) return 'avambracci';
+    if(/serratus/.test(n)) return 'obliqui';
+    return null;
+  }
+  function htmlToText(h){ const doc = new DOMParser().parseFromString(String(h||''), 'text/html'); return (doc.body.textContent||'').replace(/\s+/g,' ').trim(); } // DOMParser: non esegue nulla del contenuto
+  function briefText(t, maxSentences){
+    const parts = t.split(/(?<=[.!?])\s+/).filter(Boolean);
+    return parts.slice(0, maxSentences).join(' ');
+  }
+
+  // accetto solo immagini servite da wger.de (https), mai altri indirizzi
+  function safeWgerUrl(u){
+    try{ const url = new URL(String(u||''), WGER); return (url.protocol==='https:' && url.hostname==='wger.de') ? url.href : null; }catch(e){ return null; }
+  }
+  function wgerToInfo(d){
+    if(!d || typeof d !== 'object' || !Number.isInteger(d.id)) return null;
+    const tr = Array.isArray(d.translations) ? d.translations : [];
+    const it = tr.find(t=>t.language===WGER_LANG.it), en = tr.find(t=>t.language===WGER_LANG.en);
+    if(!it && !en) return null;
+    const descIt = it ? htmlToText(it.description) : '', descEn = en ? htmlToText(en.description) : '';
+    const useIt = descIt.length >= 60 || !descEn; // molte descrizioni italiane su wger sono vuote o di poche parole
+    const p = Array.from(new Set((d.muscles||[]).map(wgerMuscleKey).filter(Boolean)));
+    const sMus = Array.from(new Set((d.muscles_secondary||[]).map(wgerMuscleKey).filter(k=>k && !p.includes(k))));
+    const mainImg = (d.images||[]).find(i=>i.is_main) || (d.images||[])[0];
+    return {
+      id: d.id, name: (it && it.name) || en.name, nameEn: en && en.name,
+      lang: useIt ? 'it' : 'en', description: briefText(useIt ? descIt : descEn, 3),
+      category: d.category && d.category.name, equipment: (d.equipment||[]).map(e=>e.name).join(', '),
+      muscles: {p, s:sMus},
+      image: mainImg ? safeWgerUrl(mainImg.image) : null,
+    };
+  }
+
+  function wgerInfoHtml(info){
+    return `
+      <div class="off-result" style="margin-top:10px;">
+        <div class="pname">${escapeHtml(info.name)}</div>
+        <div class="pbrand">${escapeHtml([info.category, info.equipment].filter(Boolean).join(' · '))}</div>
+        ${safeWgerUrl(info.image) ? `<img src="${escapeHtml(safeWgerUrl(info.image))}" alt="" style="width:100%;max-height:200px;object-fit:contain;background:#fff;border-radius:10px;margin-top:8px;" onerror="this.remove()">` : ''}
+        ${(info.muscles.p.length || info.muscles.s.length) ? muscleMapSvg(info.muscles) + muscleLegend(info.muscles) : ''}
+        ${info.description ? `<div class="ex-text" style="margin-top:8px;"><b>Come si fa${info.lang==='en'?' (in inglese)':''}:</b> ${escapeHtml(info.description)}</div>` : '<div class="ex-text" style="margin-top:8px;">Nessuna descrizione disponibile per questo esercizio.</div>'}
+        <div class="ex-text" style="margin-top:6px;"><b>⚠️ In generale:</b> schiena neutra, movimento controllato, peso che ti permette una tecnica pulita.</div>
+        <div style="font-size:11.5px;color:var(--ink-dim);margin-top:6px;">Fonte: <a href="https://wger.de/exercise/${Number(info.id)||''}/" target="_blank" rel="noopener noreferrer" style="color:inherit;">wger.de</a> (CC-BY-SA)</div>
+      </div>`;
+  }
+
+  /* ---------- suggerimenti brevi mentre scrivi (al posto del menu a tendina) ---------- */
+  function exerciseSuggestions(text){
+    const q = cleanExName(text);
+    if(q.length < 2) return [];
+    const names = new Map();
+    const add = n => { const k = cleanExName(n); if(k && !names.has(k)) names.set(k, n); };
+    const starts = t => (' '+cleanExName(t)).includes(' '+q); // la parola deve iniziare così
+    EXERCISE_LIBRARY.forEach(ex=>{ if(exAliases(ex).some(starts)) add(ex.name); });
+    Object.values(maxlifts||{}).forEach(m=>{ if(starts(m.label)) add(m.label); });
+    WORKOUT_TYPES.forEach(n=>{ if(starts(n)) add(n); });
+    return Array.from(names.values()).filter(n=>cleanExName(n)!==q).slice(0,5);
+  }
+  function attachSuggest(inputSel, boxSel, onPick){
+    const input = $(inputSel), box = $(boxSel);
+    const render = ()=>{
+      const list = exerciseSuggestions(input.value);
+      box.innerHTML = list.map(n=>`<div class="chip">${escapeHtml(n)}</div>`).join('');
+      $$('.chip', box).forEach((c,i)=>c.addEventListener('click', ()=>{ input.value = list[i]; box.innerHTML=''; onPick && onPick(); }));
+    };
+    input.addEventListener('input', render);
+    input.addEventListener('blur', ()=>setTimeout(()=>{ box.innerHTML=''; }, 200));
+  }
+
+  /* ---------- immagini animate da Free Exercise DB (pubblico dominio, su GitHub, nessuna chiave, nessun limite) ----------
+     Ogni esercizio ha 2 foto (posizione iniziale e finale): le alterno per mostrare il movimento. */
+  const FX = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/';
+  const FX_LIB = { squat:'Barbell_Squat', affondi:'Dumbbell_Lunges', stacco:'Barbell_Deadlift', panca:'Barbell_Bench_Press_-_Medium_Grip',
+    military:'Standing_Military_Press', trazioni:'Pullups', rematore:'Bent_Over_Barbell_Row', curl:'Barbell_Curl', pushup:'Pushups',
+    plank:'Plank', jumpingjack:'Star_Jump', mountainclimber:'Mountain_Climbers', plancklaterale:'Side_Bridge', hipthrust:'Barbell_Hip_Thrust',
+    stacco_rumeno:'Romanian_Deadlift', legpress:'Leg_Press', latmachine:'Wide-Grip_Lat_Pulldown', panca_inclinata:'Barbell_Incline_Bench_Press_-_Medium_Grip',
+    alzate_laterali:'Side_Lateral_Raise', dip:'Dips_-_Chest_Version', calf:'Standing_Calf_Raises' };
+  const IT_STOP = new Set(['ai','al','alla','alle','agli','con','col','coi','da','di','del','della','a','in','su','sul','sulla','i','il','la','le','lo','gli','e','per']);
+  function fxSafeId(id){ return /^[A-Za-z0-9_\-(),.']{2,120}$/.test(String(id||'')) ? String(id) : null; }
+  function fxImg(id, n){ const s = fxSafeId(id); return s ? FX + 'exercises/' + encodeURIComponent(s) + '/' + n + '.jpg' : null; }
+  function fxAnimHtml(id){
+    const a = fxImg(id,0), b = fxImg(id,1); if(!a) return '';
+    return `<div class="fx-anim"><img src="${escapeHtml(a)}" alt="" loading="lazy" onerror="this.parentNode.remove()"><img src="${escapeHtml(b)}" alt="" loading="lazy" class="fx-b" onerror="this.remove()"></div>
+      <div style="font-size:11px;color:var(--ink-dim);text-align:center;margin-top:2px;">Immagini: Free Exercise DB (pubblico dominio)</div>`;
+  }
+  function fxMuscleKey(m){
+    m = String(m||'').toLowerCase();
+    return ({abdominals:'addome',biceps:'bicipiti',calves:'polpacci',chest:'petto',forearms:'avambracci',glutes:'glutei',hamstrings:'femorali',
+      lats:'dorsali','lower back':'lombari','middle back':'trapezi',quadriceps:'quadricipiti',shoulders:'spalle',traps:'trapezi',triceps:'tricipiti'})[m] || null;
+  }
+  // indice leggero di tutti gli esercizi (scaricato una volta, poi resta sul telefono)
+  let fxIndexMem = null;
+  async function fxIndex(){
+    if(fxIndexMem) return fxIndexMem;
+    const cached = wgerCacheGet('fx_index_v1');
+    if(Array.isArray(cached) && cached.length > 100){ fxIndexMem = cached; return cached; }
+    const res = await fetch(FX + 'dist/exercises.json', {credentials:'omit', referrerPolicy:'no-referrer'});
+    if(!res.ok) throw new Error('fx '+res.status);
+    const all = await res.json();
+    fxIndexMem = (Array.isArray(all)?all:[]).map(e=>({ id: fxSafeId(e.id), n: String(e.name||''), p:(e.primaryMuscles||[]).map(String), s:(e.secondaryMuscles||[]).map(String), q:String(e.equipment||''),
+      i:(Array.isArray(e.instructions)?e.instructions:[]).slice(0,3).map(t=>String(t).slice(0,300)) })).filter(e=>e.id && e.n);
+    wgerCacheSet('fx_index_v1', fxIndexMem);
+    return fxIndexMem;
+  }
+  async function fxSearch(term){
+    const idx = await fxIndex();
+    const words = itToEn(term).split(' ').filter(w=>w && !IT_STOP.has(w)).map(w=>w.replace(/s$/,''));
+    if(!words.length) return [];
+    const scored = idx.map(e=>{
+      const n = ' '+cleanExName(e.n).replace(/-/g,' ')+' ';
+      const hit = words.filter(w=>n.includes(' '+w)).length;
+      return { e, sc: hit*10 - n.length/20 + (hit===words.length ? 50 : 0) };
+    }).filter(x=>x.sc > 5).sort((a,b)=>b.sc-a.sc);
+    const best = scored.length ? Math.floor(scored[0].sc/10) : 0;
+    return scored.filter(x=>Math.floor(x.sc/10) >= best-1).slice(0,5).map(x=>x.e);
+  }
+  function fxInfoHtml(e){
+    const mus = { p: Array.from(new Set(e.p.map(fxMuscleKey).filter(Boolean))), s: [] };
+    mus.s = Array.from(new Set(e.s.map(fxMuscleKey).filter(k=>k && !mus.p.includes(k))));
+    return `<div class="off-result" style="margin-top:10px;">
+        <div class="pname">${escapeHtml(e.n)}</div>${e.q?`<div class="pbrand">${escapeHtml(e.q)}</div>`:''}
+        ${fxAnimHtml(e.id)}
+        ${(mus.p.length||mus.s.length) ? muscleMapSvg(mus) + muscleLegend(mus) : ''}
+        ${e.i.length ? `<div class="ex-text" style="margin-top:8px;"><b>Come si fa (in inglese):</b><ol style="margin:4px 0 0 18px;padding:0;">${e.i.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ol></div>` : ''}
+        <div class="ex-text" style="margin-top:6px;"><b>⚠️ In generale:</b> schiena neutra, movimento controllato, peso che ti permette una tecnica pulita.</div>
+      </div>`;
+  }
+
+  let wgerTimer = null, wgerSeq = 0;
   function renderWorkoutInstructions(){
     const box = $('#workoutInstructionsBox');
-    const ex = findLibraryExercise($('#workoutExercise').value);
-    if(!ex){ box.innerHTML = ''; return; }
-    box.innerHTML = `
-      <div class="ex-illustration" style="margin-top:10px;">${ex.svg}</div>
-      <div class="ex-section-title">Posizione di partenza</div>
-      <div class="ex-text">${escapeHtml(ex.setup)}</div>
-      <div class="ex-section-title">Esecuzione</div>
-      <div class="ex-text">${escapeHtml(ex.execution)}</div>
-      <div class="ex-section-title">Consigli</div>
-      <div class="ex-text"><ul>${ex.tips.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul></div>
-    `;
+    const val = $('#workoutExercise').value;
+    const ex = findLibraryExercise(val);
+    clearTimeout(wgerTimer);
+    const seq = ++wgerSeq;
+    if(ex){
+      box.innerHTML = exerciseInfoHtml(ex);
+      return;
+    }
+    if(cleanExName(val).length < 3){ box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="ex-text" style="margin-top:10px;color:var(--ink-dim);">Cerco l\'esercizio...</div>';
+    wgerTimer = setTimeout(async ()=>{
+      let results = [], source = 'fx';
+      try{ results = await fxSearch(val); }catch(e){ results = []; }
+      if(!results.length){
+        source = 'wger';
+        try{ results = await wgerSearch(val); }catch(e){ results = null; }
+      }
+      if(seq !== wgerSeq) return;
+      if(results === null){ box.innerHTML = '<div class="ex-text" style="margin-top:10px;color:var(--ink-dim);">Spiegazione non disponibile ora (serve internet). Puoi registrare l\'esercizio lo stesso.</div>'; return; }
+      if(!results.length){ box.innerHTML = '<div class="ex-text" style="margin-top:10px;color:var(--ink-dim);">Esercizio non trovato: puoi registrarlo lo stesso.</div>'; return; }
+      box.innerHTML = `<div style="font-size:12.5px;color:var(--ink-dim);margin-top:10px;">Esercizi trovati (tocca quello giusto):</div>
+        <div class="chips" id="wgerChips">${results.map((r,i)=>`<div class="chip" data-i="${i}">${escapeHtml(source==='fx'?r.n:r.name)}</div>`).join('')}</div>
+        <div id="wgerInfoBox"></div>`;
+      const pick = (c)=>{
+        $$('#wgerChips .chip').forEach(x=>x.classList.toggle('active', x===c));
+        const info = results[parseInt(c.dataset.i,10)];
+        if(info) $('#wgerInfoBox').innerHTML = source==='fx' ? fxInfoHtml(info) : wgerInfoHtml(info);
+      };
+      $$('#wgerChips .chip').forEach(c=>c.addEventListener('click', ()=>pick(c)));
+      pick($('#wgerChips .chip'));
+    }, 500);
   }
+
+
+
+  const MNAME = {quadricipiti:'Quadricipiti',glutei:'Glutei',femorali:'Femorali',lombari:'Lombari',addome:'Addome',polpacci:'Polpacci',dorsali:'Dorsali',trapezi:'Trapezi',avambracci:'Avambracci',petto:'Petto',spalle:'Spalle',tricipiti:'Tricipiti',bicipiti:'Bicipiti',obliqui:'Obliqui'};
+  function muscleLegend(mus){
+    return `<div style="font-size:12.5px;color:var(--ink-dim);text-align:center;margin-top:2px;">
+      <span style="color:var(--amber);">■</span> ${mus.p.map(k=>MNAME[k]).join(', ') || '—'}${mus.s.length ? ` · <span style="color:var(--amber);opacity:.35;">■</span> ${mus.s.map(k=>MNAME[k]).join(', ')}` : ''}</div>`;
+  }
+  // spiegazione breve: muscoli, come si fa, 2 errori da evitare
+  function exerciseInfoHtml(ex){
+    const mus = EX_MUSCLES[ex.id];
+    return `
+      <div class="off-result" style="margin-top:10px;">
+        <div class="pname">${escapeHtml(ex.name)}</div><div class="pbrand">${escapeHtml(ex.muscle)}</div>
+        ${FX_LIB[ex.id] ? fxAnimHtml(FX_LIB[ex.id]) : ''}
+        ${mus ? muscleMapSvg(mus) + muscleLegend(mus) : ''}
+        <div class="ex-text" style="margin-top:8px;"><b>Come si fa:</b> ${escapeHtml(ex.execution)}</div>
+        ${ex.errors && ex.errors.length ? `<div class="ex-text" style="margin-top:6px;"><b>⚠️ Evita:</b> ${ex.errors.slice(0,2).map(escapeHtml).join(' · ')}</div>` : ''}
+        <details style="margin-top:6px;font-size:13.5px;"><summary style="cursor:pointer;color:var(--ink-dim);">Più dettagli</summary>
+          <div class="ex-text" style="margin-top:6px;"><b>Posizione:</b> ${escapeHtml(ex.setup)}</div>
+          <div class="ex-text"><ul>${ex.tips.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ul></div>
+        </details>
+      </div>`;
+  }
+
 
   $('#btnAddWorkout').addEventListener('click', ()=>{
     $('#workoutExercise').value=''; $('#workoutSets').value=''; $('#workoutReps').value='';
@@ -1900,13 +2823,25 @@
     $('#workoutDuration').value=''; $('#workoutNote').value=''; $('#workoutIntensity').value='Media';
     workoutWeightMode = 'nessuno';
     $('#workoutInstructionsBox').innerHTML = '';
+    $('#workoutSetsBox').innerHTML = '';
     populateExerciseDatalist();
     buildWorkoutWeightModeChips();
     toggleWorkoutWeightMode();
     openModal('modalWorkout');
   });
-  $('#workoutExercise').addEventListener('input', ()=>{ renderWorkoutInstructions(); updateWorkoutComputed(); });
+  attachSuggest('#workoutExercise', '#workoutExSuggest', ()=>$('#workoutExercise').dispatchEvent(new Event('input')));
+  attachSuggest('#maxliftExercise', '#maxliftExSuggest');
+  $('#workoutExercise').addEventListener('input', ()=>{
+    renderWorkoutInstructions();
+    if(workoutWeightMode === 'nessuno' && findMaxFor($('#workoutExercise').value)){
+      workoutWeightMode = 'percentuale'; buildWorkoutWeightModeChips(); toggleWorkoutWeightMode();
+    }
+    updateWorkoutComputed();
+  });
   $('#workoutPercent').addEventListener('input', updateWorkoutComputed);
+  $('#workoutSets').addEventListener('input', updateWorkoutComputed);
+  $('#workoutReps').addEventListener('input', updateWorkoutComputed);
+  $('#workoutWeightDirect').addEventListener('input', ()=>renderWorkoutSets());
 
   $('#workoutSaveBtn').addEventListener('click', async ()=>{
     const exercise = $('#workoutExercise').value.trim();
@@ -1917,14 +2852,16 @@
     if(workoutWeightMode === 'diretto'){
       weight = Number($('#workoutWeightDirect').value) || null;
     } else if(workoutWeightMode === 'percentuale'){
-      const m = maxlifts[normalizeExName(exercise)];
+      const m = findMaxFor(exercise);
       if(!m){ toast('Nessun massimale salvato per questo esercizio'); return; }
       pct = Number($('#workoutPercent').value) || 0;
       maxUsed = m.weight;
       weight = Math.round((m.weight * pct / 100) / 2.5) * 2.5;
     }
+    const setReps = $$('.set-reps-input').map(i=>Number(i.value)||0);
+    const est1RM = weight ? Math.round(Math.max(0, ...setReps.map(r=>epley1RM(weight, r)))*2)/2 : null;
     const entry = {
-      id: uid(), kind:'workout', exercise, sets, reps, weight, pct, maxUsed,
+      id: uid(), kind:'workout', exercise, sets, reps, weight, pct, maxUsed, setReps: setReps.length ? setReps : null, est1RM: est1RM || null,
       duration: Number($('#workoutDuration').value)||null,
       intensity: $('#workoutIntensity').value,
       note: $('#workoutNote').value.trim() || null
@@ -1938,6 +2875,7 @@
 
   function renderWorkouts(){
     const wrap = $('#workoutList');
+    $('#workoutDayLabel').textContent = fmtDate(currentDate) === fmtDate(new Date()) ? 'oggi' : dayLabel(currentDate);
     if(workoutEntries.length===0){ wrap.innerHTML = '<div class="empty">Nessun allenamento registrato per questo giorno</div>'; return; }
     wrap.innerHTML = workoutEntries.map(e=>{
       // formati precedenti (compatibilità con dati salvati prima di questo aggiornamento)
@@ -1961,12 +2899,32 @@
       if(e.weight) metaBits.push(`@ ${e.weight}kg${e.pct?` (${e.pct}% di ${e.maxUsed}kg)`:''}`);
       if(e.duration) metaBits.push(`${e.duration} min`);
       if(e.intensity) metaBits.push(e.intensity);
+      const curMax = findMaxFor(e.exercise);
+      const canUpdateMax = e.est1RM && (!curMax || e.est1RM > curMax.weight);
       return `<div class="wentry">
         <div class="wtop"><span class="wtype">${escapeHtml(e.exercise)}</span><button class="del" data-id="${e.id}">✕</button></div>
         ${metaBits.length ? `<div class="wmeta">${metaBits.join(' · ')}</div>` : ''}
+        ${e.setReps ? `<div class="wmeta">Ripetizioni fatte: ${e.setReps.join(' · ')}${e.est1RM ? ` · massimale stimato ${e.est1RM} kg` : ''}</div>` : ''}
+        ${canUpdateMax ? `<button class="btn" data-upd-max="${e.id}" style="margin-top:8px;font-size:13px;padding:6px 10px;">⬆️ Imposta ${e.est1RM} kg come nuovo massimale</button>` : ''}
         ${e.note ? `<div class="wnote">${escapeHtml(e.note)}</div>` : ''}
       </div>`;
     }).join('');
+    $$('#workoutList [data-upd-max]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const e = workoutEntries.find(x=>x.id===btn.dataset.updMax); if(!e || !e.est1RM) return;
+        const cur = findMaxFor(e.exercise);
+        const key = cur ? cur.key : normalizeExName(e.exercise);
+        const label = cur ? cur.label : e.exercise;
+        const old = maxlifts[key];
+        const history = old && Array.isArray(old.history) ? old.history.slice() : [];
+        history.push({ date: fmtDate(currentDate), weight: e.est1RM });
+        maxlifts[key] = { label, weight: e.est1RM, history };
+        await storeSet('maxlifts', maxlifts);
+        renderMaxliftsList();
+        renderWorkouts();
+        toast(`Massimale di ${label}: ${e.est1RM} kg`);
+      });
+    });
     $$('#workoutList .del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         workoutEntries = workoutEntries.filter(x=>x.id!==btn.dataset.id);
@@ -2149,7 +3107,7 @@
       }
       resultsWrap.innerHTML = scored.map(s=>`
         <div class="recipe-card" data-id="${s.meal.idMeal}">
-          <div class="recipe-thumb"><img src="${s.meal.strMealThumb}/medium" alt=""></div>
+          <div class="recipe-thumb"><img src="${escapeHtml(safeMealImg(s.meal.strMealThumb))}/medium" alt=""></div>
           <div>
             <div class="recipe-name">${escapeHtml(s.meal.strMeal)}</div>
             <div class="recipe-match">${s.matchCount}/${wanted.length} ingredienti che hai</div>
@@ -2183,7 +3141,7 @@
       }
       const instructions = (meal.strInstructions||'').split(/\r?\n+/).filter(Boolean);
       content.innerHTML = `
-        <div class="recipe-hero"><img src="${meal.strMealThumb}/large" alt=""></div>
+        <div class="recipe-hero"><img src="${escapeHtml(safeMealImg(meal.strMealThumb))}/large" alt=""></div>
         <h2 style="margin-top:0;">${escapeHtml(meal.strMeal)}</h2>
         <div class="eyebrow" style="margin-bottom:12px;">${escapeHtml(meal.strArea||'')} ${meal.strCategory?'· '+escapeHtml(meal.strCategory):''}</div>
         <div class="ex-section-title">Ingredienti</div>
@@ -2273,11 +3231,7 @@
   }
 
   function populateExerciseDatalist(){
-    const dl = $('#strengthExerciseList');
-    const names = new Set(EXERCISE_LIBRARY.map(e=>e.name));
-    WORKOUT_TYPES.forEach(n=>names.add(n));
-    Object.values(maxlifts).forEach(m=>names.add(m.label));
-    dl.innerHTML = Array.from(names).map(n=>`<option value="${escapeHtml(n)}">`).join('');
+    // niente più menu a tendina: i suggerimenti compaiono mentre si scrive (attachSuggest)
   }
 
   let editingMaxliftKey = null; // se valorizzato, il salvataggio modifica invece di aggiungere
@@ -2359,10 +3313,49 @@
     $('#workoutPercentWrap').style.display = workoutWeightMode==='percentuale' ? 'block' : 'none';
     if(workoutWeightMode==='percentuale') updateWorkoutComputed();
   }
+  function plannedWorkoutWeight(){
+    if(workoutWeightMode === 'diretto') return Number($('#workoutWeightDirect').value) || null;
+    if(workoutWeightMode === 'percentuale'){
+      const m = findMaxFor($('#workoutExercise').value);
+      const pct = Number($('#workoutPercent').value) || 0;
+      return m ? Math.round((m.weight * pct / 100) / 2.5) * 2.5 : null;
+    }
+    return null;
+  }
+  function epley1RM(w, r){ return (w && r) ? (r === 1 ? w : w * (1 + r/30)) : 0; }
+  function renderWorkoutSets(){
+    const box = $('#workoutSetsBox');
+    const sets = Math.min(12, Number($('#workoutSets').value) || 0);
+    const reps = Number($('#workoutReps').value) || 0;
+    if(!sets || !reps){ box.innerHTML = ''; return; }
+    const w = plannedWorkoutWeight();
+    const prev = $$('.set-reps-input', box).map(i=>i.value);
+    let html = `<label class="field">Ripetizioni fatte per serie</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;">`;
+    for(let i=0;i<sets;i++){
+      const v = prev[i] != null && prev[i] !== '' ? prev[i] : reps;
+      html += `<div style="text-align:center;"><div style="font-size:12px;color:var(--ink-dim);">Serie ${i+1}${w?` · ${w}kg`:''}</div>
+        <input type="number" class="set-reps-input" min="0" value="${escapeHtml(String(v))}" style="text-align:center;"></div>`;
+    }
+    html += `</div><div id="workoutEst1RM" style="font-size:13px;color:var(--ink-dim);margin-top:6px;"></div>`;
+    box.innerHTML = html;
+    $$('.set-reps-input', box).forEach(i=>i.addEventListener('input', updateEst1RM));
+    updateEst1RM();
+  }
+  function updateEst1RM(){
+    const el = $('#workoutEst1RM'); if(!el) return;
+    const w = plannedWorkoutWeight();
+    const done = $$('.set-reps-input').map(i=>Number(i.value)||0);
+    const best = Math.max(0, ...done.map(r=>epley1RM(w, r)));
+    if(!w || !best){ el.textContent = ''; return; }
+    const m = findMaxFor($('#workoutExercise').value);
+    const est = Math.round(best*2)/2;
+    el.innerHTML = `Massimale stimato da questa sessione: <b>${est} kg</b>` + (m ? (est > m.weight ? ` <span style="color:var(--amber);">(sopra il tuo ${m.weight} kg)</span>` : ` (salvato: ${m.weight} kg)`) : '');
+  }
+
   function updateWorkoutComputed(){
+    renderWorkoutSets();
     if(workoutWeightMode!=='percentuale') return;
-    const name = normalizeExName($('#workoutExercise').value);
-    const m = maxlifts[name];
+    const m = findMaxFor($('#workoutExercise').value);
     const pct = Number($('#workoutPercent').value) || 0;
     if(!m){
       $('#workoutMaxDisplay').value = 'non salvato';
@@ -2370,10 +3363,12 @@
       $('#workoutComputedNote').textContent = 'Salva prima il massimale di questo esercizio (pulsante "I miei massimali") per calcolare automaticamente il peso.';
       return;
     }
-    $('#workoutMaxDisplay').value = m.weight + ' kg';
+    $('#workoutMaxDisplay').value = m.weight + ' kg' + (normalizeExName(m.label) !== normalizeExName($('#workoutExercise').value) ? ` (${m.label})` : '');
     const exact = m.weight * pct / 100;
     const rounded = Math.round(exact / 2.5) * 2.5;
     $('#workoutComputedValue').textContent = `${rounded} kg`;
+    const sets = Number($('#workoutSets').value) || 0, reps = Number($('#workoutReps').value) || 0;
+    $('#workoutComputedValue').textContent = sets && reps ? `${sets} × ${reps} con ${rounded} kg` : `${rounded} kg`;
     $('#workoutComputedNote').textContent = `${pct}% di ${m.weight}kg = ${exact.toFixed(1)}kg (arrotondato a ${rounded}kg, multipli da 2.5kg)`;
   }
 
