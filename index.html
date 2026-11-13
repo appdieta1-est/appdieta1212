@@ -743,9 +743,9 @@
   const APP = /*APP_CONFIG*/{"prefix": "logbook_v1_", "faceIdKey": "logbook_faceid_cred_id_v2", "userPinKey": "logbook_esther_user_pin_v2", "forcePinChange": true, "ownerMatch": "esther|ester", "hasStarterPlan": true}/*END_APP_CONFIG*/;
 
   /* ---------- blocco con password (PBKDF2, più resistente al tentativo di forzatura offline) ---------- */
-  const PW_SALT_HEX = 'a7a632ea6be16f765025cea60eb80333';
+  const PW_SALT_HEX = '211660d96c9f10edd1ce8e82f9d77356';
   const PW_ITERATIONS = 150000;
-  const PW_TARGET_HEX = '555c71b740f302c20dc77edac7954a35f436925d2569b4819554c3cb6e68c7da';
+  const PW_TARGET_HEX = 'c3cbaea14b593ebf510f5d049326a430e6ae7e29b0ba0d51259488deffe3f025';
 
   function hexToBytes(hex){
     const bytes = new Uint8Array(hex.length/2);
@@ -1800,13 +1800,13 @@
 
   // nomi alternativi: scrivendo "stacco" trovo "Stacco da terra", ecc.
   const EX_ALIASES = {
-    squat:['squat','accosciata','back squat'], affondi:['affondi','affondo','lunge','lunges','bulgaro','bulgarian'],
+    squat:['squat','accosciata','back squat'], affondi:['affondi','affondo','lunge','lunges','bulgaro','bulgarian','split squat','affondi bulgari'],
     stacco:['stacco','stacco da terra','deadlift','stacchi','stacco sumo'], panca:['panca','panca piana','bench','bench press','distensioni'],
     military:['military','lento avanti','overhead press','shoulder press','lento'], trazioni:['trazioni','pull up','pullup','chin up'],
     rematore:['rematore','row','pulley','rematore manubrio'], curl:['curl','bicipiti'], pushup:['piegamenti','flessioni','push up','pushup'],
     plank:['plank'], burpee:['burpee','burpees'], jumpingjack:['jumping jack','jumping jacks'], mountainclimber:['mountain climber','mountain climbers'],
     plancklaterale:['plank laterale','side plank'], hipthrust:['hip thrust','ponte glutei','glute bridge'],
-    stacco_rumeno:['stacco rumeno','rdl','romanian deadlift','stacco gambe tese'], legpress:['leg press','pressa'],
+    stacco_rumeno:['stacco rumeno','rdl','romanian deadlift','stacco gambe tese','stacco a gambe tese'], legpress:['leg press','pressa'],
     latmachine:['lat machine','lat pulldown','lat'], panca_inclinata:['panca inclinata','inclinata','incline bench'],
     alzate_laterali:['alzate laterali','alzate','lateral raise'], dip:['dip','dips','parallele'], calf:['calf','calf raise','polpacci'],
   };
@@ -2556,7 +2556,7 @@
     if(!ex) return null;
     for(const [k,m] of Object.entries(maxlifts)){
       const mex = findLibraryExercise(m.label);
-      if(mex && mex.id === ex.id) return Object.assign({key:k}, m);
+      if(mex && mex.id === ex.id && isDbName(m.label) === isDbName(name)) return Object.assign({key:k}, m);
     }
     return null;
   }
@@ -2572,7 +2572,7 @@
     ['alzate laterali','lateral raise'],['alzate frontali','front raise'],['alzate','raise'],['croci','fly'],['curl martello','hammer curl'],
     ['french press','skull crusher'],['estensioni','extension'],['tricipiti','triceps'],['bicipiti','biceps'],['polpacci','calf raise'],['affondi','lunge'],
     ['affondo','lunge'],['pressa','leg press'],['accosciata','squat'],['ponte','glute bridge'],['addominali','crunch'],['crunch','crunch'],
-    ['manubri','dumbbell'],['manubrio','dumbbell'],['bilanciere','barbell'],['cavi','cable'],['cavo','cable'],['macchina','machine'],
+    ['manubri','dumbbell'],['manubrio','dumbbell'],['mancuernas','dumbbell'],['mancuerna','dumbbell'],['bilanciere','barbell'],['cavi','cable'],['cavo','cable'],['macchina','machine'],
     ['piegamenti','push up'],['flessioni','push up'],['scrollate','shrug'],['iperestensioni','hyperextension'],['face pull','face pull'],
     ['leg curl','leg curl'],['leg extension','leg extension'],['hip thrust','hip thrust'],['plank','plank'],['tirate al mento','upright row'],
   ];
@@ -2682,8 +2682,9 @@
     const names = new Map();
     const add = n => { const k = cleanExName(n); if(k && !names.has(k)) names.set(k, n); };
     const starts = t => (' '+cleanExName(t)).includes(' '+q); // la parola deve iniziare così
-    EXERCISE_LIBRARY.forEach(ex=>{ if(exAliases(ex).some(starts)) add(ex.name); });
+    EXERCISE_LIBRARY.forEach(ex=>{ if(starts(ex.name) || exAliases(ex).some(a=>a.startsWith(q))) add(ex.name); });
     Object.values(maxlifts||{}).forEach(m=>{ if(starts(m.label)) add(m.label); });
+    EX_VARIANTS.forEach(v=>{ if(starts(v.name)) add(v.name); });
     WORKOUT_TYPES.forEach(n=>{ if(starts(n)) add(n); });
     return Array.from(names.values()).filter(n=>cleanExName(n)!==q).slice(0,5);
   }
@@ -2721,6 +2722,31 @@
       lats:'dorsali','lower back':'lombari','middle back':'trapezi',quadriceps:'quadricipiti',shoulders:'spalle',traps:'trapezi',triceps:'tricipiti'})[m] || null;
   }
   // indice leggero di tutti gli esercizi (scaricato una volta, poi resta sul telefono)
+  // varianti: stesso movimento della libreria, ma con i manubri (o un'impugnatura diversa)
+  const DB_RE = /\b(manubri|manubrio|mancuernas?|dumbbells?|db|kettlebell)\b/;
+  const EX_VARIANTS = [
+    { base:'stacco_rumeno', name:'Stacco rumeno con manubri', fx:'Stiff-Legged_Dumbbell_Deadlift', re:DB_RE },
+    { base:'squat', name:'Goblet squat', fx:'Goblet_Squat', re:/\bgoblet\b/ },
+    { base:'squat', name:'Squat con manubri', fx:'Dumbbell_Squat', re:DB_RE },
+    { base:'affondi', name:'Split squat (bulgaro) con manubri', fx:'Split_Squat_with_Dumbbells', re:/\b(split|bulgar[oiae]?|bulgarian)\b/ },
+    { base:'affondi', name:'Affondi indietro con manubri', fx:'Dumbbell_Rear_Lunge', re:/\b(indietro|inversi|reverse|rear)\b/ },
+    { base:'affondi', name:'Affondi con manubri', fx:'Dumbbell_Lunges', re:DB_RE },
+    { base:'panca', name:'Panca piana con manubri', fx:'Dumbbell_Bench_Press', re:DB_RE },
+    { base:'panca_inclinata', name:'Panca inclinata con manubri', fx:'Incline_Dumbbell_Press', re:DB_RE },
+    { base:'military', name:'Lento avanti con manubri', fx:'Dumbbell_Shoulder_Press', re:DB_RE },
+    { base:'rematore', name:'Rematore con manubrio', fx:'One-Arm_Dumbbell_Row', re:DB_RE },
+    { base:'curl', name:'Curl a martello', fx:'Hammer_Curls', re:/\b(martello|hammer)\b/ },
+    { base:'curl', name:'Curl con manubri', fx:'Dumbbell_Bicep_Curl', re:DB_RE },
+    { base:'calf', name:'Calf raise con manubri', fx:'Standing_Dumbbell_Calf_Raise', re:DB_RE },
+  ];
+  function exVariantFor(name, ex){
+    if(!ex) return null;
+    const n = cleanExName(name);
+    if(EX_VARIANTS.some(v=>cleanExName(v.name)===n && v.base===ex.id)) return EX_VARIANTS.find(v=>cleanExName(v.name)===n);
+    return EX_VARIANTS.find(v=>v.base===ex.id && v.re.test(n)) || null;
+  }
+  function isDbName(name){ const n = cleanExName(name); return DB_RE.test(n) || /\b(goblet|martello|hammer)\b/.test(n); }
+
   let fxIndexMem = null;
   async function fxIndex(){
     if(fxIndexMem) return fxIndexMem;
@@ -2770,7 +2796,7 @@
       return;
     }
     if(ex){
-      box.innerHTML = exerciseInfoHtml(ex);
+      box.innerHTML = exerciseInfoHtml(ex, val);
       return;
     }
     if(cleanExName(val).length < 3){ box.innerHTML = ''; return; }
@@ -2806,12 +2832,14 @@
       <span style="color:var(--amber);">■</span> ${mus.p.map(k=>MNAME[k]).join(', ') || '—'}${mus.s.length ? ` · <span style="color:var(--amber);opacity:.35;">■</span> ${mus.s.map(k=>MNAME[k]).join(', ')}` : ''}</div>`;
   }
   // spiegazione breve: muscoli, come si fa, 2 errori da evitare
-  function exerciseInfoHtml(ex){
+  function exerciseInfoHtml(ex, typed){
     const mus = EX_MUSCLES[ex.id];
+    const vr = exVariantFor(typed||'', ex);
+    const fxId = vr ? vr.fx : FX_LIB[ex.id];
     return `
       <div class="off-result" style="margin-top:10px;">
-        <div class="pname">${escapeHtml(ex.name)}</div><div class="pbrand">${escapeHtml(ex.muscle)}</div>
-        ${FX_LIB[ex.id] ? fxAnimHtml(FX_LIB[ex.id]) : ''}
+        <div class="pname">${escapeHtml(vr ? vr.name : ex.name)}</div><div class="pbrand">${escapeHtml(ex.muscle)}</div>
+        ${fxId ? fxAnimHtml(fxId) : ''}
         ${mus ? muscleMapSvg(mus) + muscleLegend(mus) : ''}
         <div class="ex-text" style="margin-top:8px;"><b>Come si fa:</b> ${escapeHtml(ex.execution)}</div>
         ${ex.errors && ex.errors.length ? `<div class="ex-text" style="margin-top:6px;"><b>⚠️ Evita:</b> ${ex.errors.slice(0,2).map(escapeHtml).join(' · ')}</div>` : ''}
