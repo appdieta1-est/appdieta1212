@@ -244,7 +244,8 @@
   .ex-card .ex-thumb svg{ width:100%; height:100%; }
   .ex-card .ex-name{ font-size:15.5px; font-weight:600; }
   .ex-card .ex-muscle{ font-size:12.5px; color:var(--ink-dim); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
-  .fx-anim{ position:relative; width:100%; max-width:300px; aspect-ratio:3/2; margin:8px auto 0; border-radius:12px; overflow:hidden; background:#fff; }
+  .fx-wrap{ margin-top:8px; } .fx-wrap summary{ cursor:pointer; color:var(--amber); font-size:13.5px; list-style:none; }
+  .fx-anim{ position:relative; width:100%; max-width:220px; aspect-ratio:3/2; margin:8px auto 0; border-radius:12px; overflow:hidden; background:#fff; }
   .fx-anim img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
   .fx-anim .fx-b{ animation: fxSwap 1.6s steps(1) infinite; }
   @keyframes fxSwap{ 0%{opacity:0} 50%{opacity:1} }
@@ -742,9 +743,9 @@
   const APP = /*APP_CONFIG*/{"prefix": "logbook_v1_", "faceIdKey": "logbook_faceid_cred_id_v2", "userPinKey": "logbook_esther_user_pin_v2", "forcePinChange": true, "ownerMatch": "esther|ester", "hasStarterPlan": true}/*END_APP_CONFIG*/;
 
   /* ---------- blocco con password (PBKDF2, più resistente al tentativo di forzatura offline) ---------- */
-  const PW_SALT_HEX = '5d2ff40ad7cc1599bd8600299fced2e1';
+  const PW_SALT_HEX = 'a7a632ea6be16f765025cea60eb80333';
   const PW_ITERATIONS = 150000;
-  const PW_TARGET_HEX = '90d2a1ac42e44d79304c496c903cb85c696994ac834425559ea91f96f680702e';
+  const PW_TARGET_HEX = '555c71b740f302c20dc77edac7954a35f436925d2569b4819554c3cb6e68c7da';
 
   function hexToBytes(hex){
     const bytes = new Uint8Array(hex.length/2);
@@ -2710,8 +2711,9 @@
   function fxImg(id, n){ const s = fxSafeId(id); return s ? FX + 'exercises/' + encodeURIComponent(s) + '/' + n + '.jpg' : null; }
   function fxAnimHtml(id){
     const a = fxImg(id,0), b = fxImg(id,1); if(!a) return '';
-    return `<div class="fx-anim"><img src="${escapeHtml(a)}" alt="" loading="lazy" onerror="this.parentNode.remove()"><img src="${escapeHtml(b)}" alt="" loading="lazy" class="fx-b" onerror="this.remove()"></div>
-      <div style="font-size:11px;color:var(--ink-dim);text-align:center;margin-top:2px;">Immagini: Free Exercise DB (pubblico dominio)</div>`;
+    return `<details class="fx-wrap"><summary>▶ Guarda il movimento</summary>
+      <div class="fx-anim"><img src="${escapeHtml(a)}" alt="" loading="lazy" onerror="this.parentNode.remove()"><img src="${escapeHtml(b)}" alt="" loading="lazy" class="fx-b" onerror="this.remove()"></div>
+      <div style="font-size:11px;color:var(--ink-dim);text-align:center;margin-top:2px;">Immagini: Free Exercise DB (pubblico dominio)</div></details>`;
   }
   function fxMuscleKey(m){
     m = String(m||'').toLowerCase();
@@ -2763,6 +2765,10 @@
     const ex = findLibraryExercise(val);
     clearTimeout(wgerTimer);
     const seq = ++wgerSeq;
+    if(document.activeElement === $('#workoutExercise') && cleanExName(val).length >= 1){
+      box.innerHTML = '<div class="ex-text" style="margin-top:8px;color:var(--ink-dim);font-size:12.5px;">Spiegazione e immagini compaiono quando chiudi la tastiera o tocchi un suggerimento.</div>';
+      return;
+    }
     if(ex){
       box.innerHTML = exerciseInfoHtml(ex);
       return;
@@ -2831,6 +2837,7 @@
   });
   attachSuggest('#workoutExercise', '#workoutExSuggest', ()=>$('#workoutExercise').dispatchEvent(new Event('input')));
   attachSuggest('#maxliftExercise', '#maxliftExSuggest');
+  $('#workoutExercise').addEventListener('blur', ()=>setTimeout(renderWorkoutInstructions, 250));
   $('#workoutExercise').addEventListener('input', ()=>{
     renderWorkoutInstructions();
     if(workoutWeightMode === 'nessuno' && findMaxFor($('#workoutExercise').value)){
